@@ -3,7 +3,9 @@
         <username></username>
         <password></password>
         <url>https://my-org.atlassian.net/rest/api/2/</url>
+        <!-- Custom field in JIRA that taxes a single text input -->
         <githubIssueNumberField>customfield_10025</githubIssueNumberField>
+        <!-- Custom field in Jira that is a pull-down / single select -->
         <githubRepoNameField>customfield_10600</githubRepoNameField>
     </jira>
     <github>
@@ -15,7 +17,10 @@
         <repository>
             <githubName>riak-java-client</githubName>
             <githubOwner>basho</githubOwner>
+            <!-- Name in your githubRepoNameField -->
             <jiraName>Java Client</jiraName>
+            <!-- Additional fields in JIRA you want populated when an issue
+                 is created in Github -->
             <jiraFields>
                 <field type="object">
                     <name>customfield_10300</name>
