@@ -1,0 +1,29 @@
+<config>
+    <jira>
+        <username></username>
+        <password></password>
+        <url>https://my-org.atlassian.net/rest/api/2/</url>
+        <githubIssueNumberField>customfield_10025</githubIssueNumberField>
+        <githubRepoNameField>customfield_10600</githubRepoNameField>
+    </jira>
+    <github>
+        <username></username>
+        <password></password>
+        <url>https://api.github.com/repos/</url>
+    </github>
+    <repositories>
+        <repository>
+            <githubName>riak-java-client</githubName>
+            <githubOwner>basho</githubOwner>
+            <jiraName>Java Client</jiraName>
+            <jiraFields>
+                <field type="object">
+                    <name>customfield_10300</name>
+                    <key>value</key>
+                    <value>Client</value>
+                </field>
+            </jiraFields>
+            <jiraProjectKey>CLIENTS</jiraProjectKey>
+        </repository>
+    </repositories>
+</config>
