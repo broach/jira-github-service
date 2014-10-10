@@ -167,6 +167,8 @@ public class GithubEvent
         private String body;
         @JsonProperty
         private User user;
+        @JsonProperty
+        private int id;
 
         public String getBody()
         {
@@ -178,6 +180,11 @@ public class GithubEvent
             return user;
         }
 
+        public int getId()
+        {
+            return id;
+        }
+        
         public static class User
         {
             @JsonProperty

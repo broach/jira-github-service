@@ -16,8 +16,10 @@
 
 package net.mostlyharmless.jghservice.resources.github;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,6 +33,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import net.mostlyharmless.jghservice.connector.github.GithubConnector;
+import net.mostlyharmless.jghservice.connector.github.ModifyComment;
 import net.mostlyharmless.jghservice.connector.github.UpdatePullRequest;
 import net.mostlyharmless.jghservice.connector.jira.AddExternalLinkToIssue;
 import net.mostlyharmless.jghservice.connector.jira.CreateIssue;
@@ -265,6 +268,8 @@ public class GithubWebhook
             config.getRepoForGithubName(event.getRepository().getName());
         String jiraProjectKey = repo.getJiraProjectKey();
 
+        Map<String, String> jiraKeyToGhNum = new HashMap<>();
+        
         for (String ghIssueNum : ghIssueNumbers)
         {
             String jql = "project = " + jiraProjectKey +
@@ -281,6 +286,7 @@ public class GithubWebhook
                 for (JiraEvent.Issue issue : issues)
                 {
                     ghIssueMentions.add(issue.getJiraIssueKey());
+                    jiraKeyToGhNum.put(issue.getJiraIssueKey(), ghIssueNum);
                 }
             }
             catch (ExecutionException ex)
@@ -307,7 +313,7 @@ public class GithubWebhook
         }
 
         // For direct JIRA mentions, we want to update the PR
-        // with the GH issue #? Unfortunately when 
+        // with the GH issue #. For GH Issue nums, the JIRA key. Unfortunately when 
         // you add an external link to a JIRA issue it doesn't send an 
         // issue update out. It seems as though editing a PR in GH doesn't
         // send out a update notice which is kinda annoying on one hand,
@@ -316,33 +322,59 @@ public class GithubWebhook
         GithubConnector ghConn = new GithubConnector(config.getGithub().getUsername(),
                                                    config.getGithub().getPassword());
 
-        for (String jKey : directJiraMentions)
+        for (String jKey : jiraIssueKeys)
         {
             try
             {
-                // Get GH issue number from issue in JIRA
-                GetIssue get = new GetIssue.Builder().withIssueKey(jKey).build();
-                JiraEvent.Issue issue = conn.execute(get);
-                // update this PR body with the GH issue number
-                if (issue.hasGithubIssueNumber())
+                if (jiraKeyToGhNum.containsKey(jKey))
                 {
-                    body = body.replace(jKey, jKey + " (#" + issue.getGithubIssueNumber() +")");
+                    String ghIssueNum = jiraKeyToGhNum.get(jKey);
+                    body = body.replace("#" + ghIssueNum, "#" + ghIssueNum + " (" + jKey + ")");
+                }
+                else
+                {
+                    // Get GH issue number from issue in JIRA
+                    GetIssue get = new GetIssue.Builder().withIssueKey(jKey).build();
+                    JiraEvent.Issue issue = conn.execute(get);
+                    // update this PR body with the GH issue number
+                    if (issue.hasGithubIssueNumber())
+                    {
+                        body = body.replace(jKey, jKey + " (#" + issue.getGithubIssueNumber() +")");
+                    }
+                }
+                
+                if (event.hasPullRequest())
+                {
                     UpdatePullRequest update = 
                         new UpdatePullRequest.Builder()
                             .withRepository(repo)
-                            .withPullRequestNumber(event.getPullRequest().getNumber())
                             .withBody(body)
+                            .withPullRequestNumber(event.getPullRequest().getNumber())
                             .build();
 
                     ghConn.execute(update);
-                }
 
+                }
+                else // pull request comment
+                {
+                    ModifyComment modify = 
+                        new ModifyComment.Builder()
+                            .withBody(body)
+                            .withRepository(repo)
+                            .withCommentId(event.getComment().getId())
+                            .build();
+
+                    ghConn.execute(modify);
+                }
             }
             catch (ExecutionException ex)
             {
                 Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
+        
+        // Do the reverse for GH issue number mentions
+        
         
     }
     

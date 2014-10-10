@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Brian Roach <roach at mostlyharmless dot net>.
+ * Copyright 2014 Brian Roach <roach at basho dot com>.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,35 +28,33 @@ import net.mostlyharmless.jghservice.resources.ServiceConfig;
 
 /**
  *
- * @author Brian Roach <roach at mostlyharmless dot net>
+ * @author Brian Roach <roach at basho dot com>
  */
-public class PostComment implements GithubCommand<Integer>
+public class ModifyComment implements GithubCommand<Integer>
 {
     @JsonProperty
     private final String body;
     @JsonIgnore
     private final ServiceConfig.Repository repo;
-    @JsonIgnore
-    private final String issueNumber;
+    @JsonIgnore 
+    private final int commentId;
     
-    private PostComment(Builder builder)
+    private ModifyComment(Builder builder)
     {
         this.body = builder.body;
         this.repo = builder.repo;
-        this.issueNumber = builder.issueNumber;
+        this.commentId = builder.commentId;
     }
     
     @Override
     public URL getUrl() throws MalformedURLException
     {
-        String urlString =  API_URL_BASE + 
-                            repo.getGithubOwner() + 
-                            "/" + 
-                            repo.getGithubName() + 
-                            "/issues/" +
-                            issueNumber +
-                            "/comments";
-        return new URL(urlString);
+        return new URL(API_URL_BASE +
+                       repo.getGithubOwner() + 
+                        "/" + 
+                        repo.getGithubName() + 
+                        "/issues/comments/" +
+                        commentId);
     }
 
     @Override
@@ -74,7 +72,7 @@ public class PostComment implements GithubCommand<Integer>
     @Override
     public int getExpectedResponseCode()
     {
-        return 201;
+        return 200;
     }
 
     @Override
@@ -89,25 +87,11 @@ public class PostComment implements GithubCommand<Integer>
     {
         private String body;
         private ServiceConfig.Repository repo;
-        private String issueNumber;
+        private Integer commentId;
         
-        public Builder() {}
-        
-        public Builder withRepo(ServiceConfig.Repository repo)
+        public Builder withRepository(ServiceConfig.Repository repo)
         {
             this.repo = repo;
-            return this;
-        }
-        
-        public Builder withIssueNumber(int issueNumber)
-        {
-            this.issueNumber = String.valueOf(issueNumber);
-            return this;
-        }
-        
-        public Builder withIssueNumber(String issueNumber)
-        {
-            this.issueNumber = issueNumber;
             return this;
         }
         
@@ -117,16 +101,21 @@ public class PostComment implements GithubCommand<Integer>
             return this;
         }
         
-        public PostComment build()
+        public Builder withCommentId(int id)
         {
-            if (repo == null || issueNumber == null || body == null)
+            this.commentId = id;
+            return this;
+        }
+        
+        public ModifyComment build()
+        {
+            if (repo == null || commentId == null || body == null)
             {
-                throw new IllegalStateException("Body, Repo, and Issue Number cannot be null");
+                throw new IllegalStateException("Body, Repo, and commentId cannot be null");
             }
-            return new PostComment(this);
+            return new ModifyComment(this);
         }
         
     }
-        
     
 }
