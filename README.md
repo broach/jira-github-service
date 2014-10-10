@@ -6,7 +6,7 @@ Web service that sits between Github and JIRA.
 See the `configExample` file for configuration. Note you must have the `context.xml` for the webapp pointed at a config.
 
 ## Current features
-# Issues
+### Issues
 * Created in Github -> JIRA
 * Created in JIRA -> Github
 * External link added to JIRA issue.
@@ -16,6 +16,6 @@ See the `configExample` file for configuration. Note you must have the `context.
 * Reopen Issue in JIRA -> reopen in Github
 * Issues moved along agile board in JIRA -> tags in Github reflect agile state
 
-# Pull Requests
+### Pull Requests
 * Mention in body via either Github's #xxx or JIRA's PROJECT-xxx creates external link on JIRA issue.
 * JIRA's PROJECT-xxx mention will automatically cause Github's #xxx to be added to body and show up on linked issue.
