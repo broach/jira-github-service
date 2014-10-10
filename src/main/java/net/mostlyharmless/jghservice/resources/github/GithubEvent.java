@@ -86,6 +86,9 @@ public class GithubEvent
         private String body;
         @JsonProperty
         private String html_url;
+        // Because github can't decide what an issue actually is
+        @JsonProperty("pull_request")
+        private PullRequest pullRequest;
 
         public String getTitle()
         {
@@ -105,6 +108,11 @@ public class GithubEvent
         public String getUrl()
         {
             return html_url;
+        }
+        
+        public boolean isReallyAPullRequest()
+        {
+            return pullRequest != null;
         }
     }
     
@@ -159,6 +167,8 @@ public class GithubEvent
         private String body;
         @JsonProperty
         private User user;
+        @JsonProperty
+        private int id;
 
         public String getBody()
         {
@@ -170,6 +180,11 @@ public class GithubEvent
             return user;
         }
 
+        public int getId()
+        {
+            return id;
+        }
+        
         public static class User
         {
             @JsonProperty

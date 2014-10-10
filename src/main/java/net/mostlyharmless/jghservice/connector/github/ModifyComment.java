@@ -30,35 +30,31 @@ import net.mostlyharmless.jghservice.resources.ServiceConfig;
  *
  * @author Brian Roach <roach at mostlyharmless dot net>
  */
-public class UpdatePullRequest implements GithubCommand<Integer>
+public class ModifyComment implements GithubCommand<Integer>
 {
-    @JsonIgnore
-    private final ServiceConfig.Repository repo;
-    @JsonIgnore
-    private final int prNumber;
-    @JsonProperty
-    private final String title;
     @JsonProperty
     private final String body;
-    @JsonProperty
-    private final String state;
+    @JsonIgnore
+    private final ServiceConfig.Repository repo;
+    @JsonIgnore 
+    private final int commentId;
     
-    
-    private UpdatePullRequest(Builder builder)
+    private ModifyComment(Builder builder)
     {
-        this.repo = builder.repo;
-        this.title = builder.title;
         this.body = builder.body;
-        this.state = builder.state;
-        this.prNumber = builder.prNumber;
+        this.repo = builder.repo;
+        this.commentId = builder.commentId;
     }
     
     @Override
     public URL getUrl() throws MalformedURLException
     {
-        return new URL(API_URL_BASE + repo.getGithubOwner() + 
-                        "/" + repo.getGithubName() + "/pulls/" +
-                        prNumber);
+        return new URL(API_URL_BASE +
+                       repo.getGithubOwner() + 
+                        "/" + 
+                        repo.getGithubName() + 
+                        "/issues/comments/" +
+                        commentId);
     }
 
     @Override
@@ -82,33 +78,20 @@ public class UpdatePullRequest implements GithubCommand<Integer>
     @Override
     public Integer processResponse(String jsonResponse) throws IOException
     {
-        JsonNode root = new ObjectMapper().readTree(jsonResponse);
-        return root.get("number").asInt();
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode root = mapper.readTree(jsonResponse);
+        return root.get("id").asInt();
     }
     
     public static class Builder
     {
-        private ServiceConfig.Repository repo;
-        private String title;
         private String body;
-        private String state;
-        private Integer prNumber;
-        
-        public Builder withPullRequestNumber(int prNumber)
-        {
-            this.prNumber = prNumber;
-            return this;
-        }
+        private ServiceConfig.Repository repo;
+        private Integer commentId;
         
         public Builder withRepository(ServiceConfig.Repository repo)
         {
             this.repo = repo;
-            return this;
-        }
-        
-        public Builder withTitle(String title)
-        {
-            this.title = title;
             return this;
         }
         
@@ -118,19 +101,19 @@ public class UpdatePullRequest implements GithubCommand<Integer>
             return this;
         }
         
-        public Builder withState(String state)
+        public Builder withCommentId(int id)
         {
-            this.state = state;
+            this.commentId = id;
             return this;
         }
         
-        public UpdatePullRequest build()
+        public ModifyComment build()
         {
-            if (repo == null || prNumber == null)
+            if (repo == null || commentId == null || body == null)
             {
-                throw new IllegalStateException("PR number and Repository must be supplied.");
+                throw new IllegalStateException("Body, Repo, and commentId cannot be null");
             }
-            return new UpdatePullRequest(this);
+            return new ModifyComment(this);
         }
         
     }
