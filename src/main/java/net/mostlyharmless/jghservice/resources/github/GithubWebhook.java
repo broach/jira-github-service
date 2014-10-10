@@ -166,127 +166,7 @@ public class GithubWebhook
         }
         else if (event.hasPullRequest())
         {
-            // PR created, see if it mentions a GH isse or JIRA issue
-            // If it does, update in JIRA. 
-            String body = event.getPullRequest().getBody();
-
-            // Scan body for Github issue mentions. Github does *not* notify 
-            // via the webhook when it updates an issue with a PR link due to
-            // a mention (or note it in the PR or issue metadata)
-            Matcher m = githubIssueMention.matcher(body);
-            List<String> ghIssueNumbers = new LinkedList<>();
-            while (m.find())
-            {
-                ghIssueNumbers.add(m.group(1));
-            }
-
-            // Scan body for direct JIRA issue key mentions. 
-            List<String> directJiraMentions = new LinkedList<>();
-            m = jiraIssueMention.matcher(body);
-            while (m.find())
-            {
-                if (config.getProjectKeys().contains(m.group(2)))
-                {
-                    directJiraMentions.add(m.group(1));
-                }
-            }
-
-            // For GH issues, we have to query JIRA and get back the issue
-            // keys that have the issue in the github issue id field and add those
-            // to the jira keys. 
-            List<String> ghIssueMentions = new LinkedList<>();
-
-            // Of course, they can't make this easy. Querying custom fields
-            // requires a format of cf[xxxx] rather than, you know, the field
-            // name.
-            m = extractCustomFieldNumber.matcher(config.getJira().getGithubIssueNumberField());
-            m.find();
-            String cfNumber = m.group(1);
-            ServiceConfig.Repository repo = 
-                config.getRepoForGithubName(event.getRepository().getName());
-            String jiraProjectKey = repo.getJiraProjectKey();
-
-            for (String ghIssueNum : ghIssueNumbers)
-            {
-                String jql = "project = " + jiraProjectKey +
-                        " and cf[" + cfNumber +
-                        "] = " + ghIssueNum;
-
-                SearchIssues search = 
-                    new SearchIssues.Builder()
-                        .withJQL(jql)
-                        .build();
-                try
-                {
-                    List<JiraEvent.Issue> issues = conn.execute(search);
-                    for (JiraEvent.Issue issue : issues)
-                    {
-                        ghIssueMentions.add(issue.getJiraIssueKey());
-                    }
-                }
-                catch (ExecutionException ex)
-                {
-                    Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-
-            // Now we have all the JIRA issues mentioned in this PR, either
-            // directly or indirectly. Update them with the link to the PR
-            List<String> jiraIssueKeys = new LinkedList<>();
-            jiraIssueKeys.addAll(directJiraMentions);
-            jiraIssueKeys.addAll(ghIssueMentions);
-            for (String jKey : jiraIssueKeys)
-            {
-                try
-                {
-                    createExternalLink(conn, jKey, event);
-                }
-                catch (ExecutionException ex)
-                {
-                    Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-
-            // For direct JIRA mentions, we want to update the PR
-            // with the GH issue #? Unfortunately when 
-            // you add an external link to a JIRA issue it doesn't send an 
-            // issue update out. It seems as though editing a PR in GH doesn't
-            // send out a update notice which is kinda annoying on one hand,
-            // but should work well here. 
-            
-            GithubConnector ghConn = new GithubConnector(config.getGithub().getUsername(),
-                                                       config.getGithub().getPassword());
-            
-            for (String jKey : directJiraMentions)
-            {
-                try
-                {
-                    // Get GH issue number from issue in JIRA
-                    GetIssue get = new GetIssue.Builder().withIssueKey(jKey).build();
-                    JiraEvent.Issue issue = conn.execute(get);
-                    // update this PR body with the GH issue number
-                    if (issue.hasGithubIssueNumber())
-                    {
-                        body = body.replace(jKey, jKey + " (#" + issue.getGithubIssueNumber() +")");
-                        UpdatePullRequest update = 
-                            new UpdatePullRequest.Builder()
-                                .withRepository(repo)
-                                .withPullRequestNumber(event.getPullRequest().getNumber())
-                                .withBody(body)
-                                .build();
-                        
-                        ghConn.execute(update);
-                    }
-                    
-                }
-                catch (ExecutionException ex)
-                {
-                    Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-            
-
-
+            linkPullRequestToIssue(conn, event);
         }
     }
     
@@ -298,9 +178,16 @@ public class GithubWebhook
         
         if (event.hasIssue())
         {
+            if (event.getIssue().isReallyAPullRequest())
+            {
+                builder.withRelationship("pull request");
+            }
+            else
+            {
+                builder.withRelationship("issue");
+            }
             GithubEvent.Issue issue = event.getIssue();
-            builder.withRelationship("issue")
-                .withTitle(issue.getTitle())
+            builder.withTitle(issue.getTitle())
                 .withUrl(issue.getUrl());
         }
         else
@@ -317,46 +204,196 @@ public class GithubWebhook
                 
     }
     
+    private List<String> scanForGithubIssueMentions(String body)
+    {
+        // Scan body for Github issue mentions. Github does *not* notify 
+        // via the webhook when it updates an issue with a PR link due to
+        // a mention (or note it in the PR or issue metadata)
+        Matcher m = githubIssueMention.matcher(body);
+        List<String> ghIssueNumbers = new LinkedList<>();
+        while (m.find())
+        {
+            ghIssueNumbers.add(m.group(1));
+        }
+        return ghIssueNumbers;
+    }
+    
+    private List<String> scanForJiraIssueMentions(String body)
+    {
+        // Scan body for direct JIRA issue key mentions. 
+        List<String> directJiraMentions = new LinkedList<>();
+        Matcher m = jiraIssueMention.matcher(body);
+        while (m.find())
+        {
+            if (config.getProjectKeys().contains(m.group(2)))
+            {
+                directJiraMentions.add(m.group(1));
+            }
+        }
+        return directJiraMentions;
+    }
+    
+    private void linkPullRequestToIssue(JiraConnector conn, GithubEvent event)
+    {
+        // PR created, see if it mentions a GH isse or JIRA issue
+        // If it does, update in JIRA. 
+        String body;
+        if (event.hasPullRequest())
+        {
+            body = event.getPullRequest().getBody();
+        }
+        else // It's a pull request comment, disguised as an issue (wrapped in an Enigma)
+        {
+            body = event.getComment().getBody();
+        }
+
+        List<String> ghIssueNumbers = scanForGithubIssueMentions(body);
+        List<String> directJiraMentions = scanForJiraIssueMentions(body);
+
+        // For GH issues, we have to query JIRA and get back the issue
+        // keys that have the issue in the github issue id field and add those
+        // to the jira keys. 
+        List<String> ghIssueMentions = new LinkedList<>();
+
+        // Of course, they can't make this easy. Querying custom fields
+        // requires a format of cf[xxxx] rather than, you know, the field
+        // name.
+        Matcher m = extractCustomFieldNumber.matcher(config.getJira().getGithubIssueNumberField());
+        m.find();
+        String cfNumber = m.group(1);
+        ServiceConfig.Repository repo = 
+            config.getRepoForGithubName(event.getRepository().getName());
+        String jiraProjectKey = repo.getJiraProjectKey();
+
+        for (String ghIssueNum : ghIssueNumbers)
+        {
+            String jql = "project = " + jiraProjectKey +
+                    " and cf[" + cfNumber +
+                    "] = " + ghIssueNum;
+
+            SearchIssues search = 
+                new SearchIssues.Builder()
+                    .withJQL(jql)
+                    .build();
+            try
+            {
+                List<JiraEvent.Issue> issues = conn.execute(search);
+                for (JiraEvent.Issue issue : issues)
+                {
+                    ghIssueMentions.add(issue.getJiraIssueKey());
+                }
+            }
+            catch (ExecutionException ex)
+            {
+                Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+
+        // Now we have all the JIRA issues mentioned in this PR, either
+        // directly or indirectly. Update them with the link to the PR
+        List<String> jiraIssueKeys = new LinkedList<>();
+        jiraIssueKeys.addAll(directJiraMentions);
+        jiraIssueKeys.addAll(ghIssueMentions);
+        for (String jKey : jiraIssueKeys)
+        {
+            try
+            {
+                createExternalLink(conn, jKey, event);
+            }
+            catch (ExecutionException ex)
+            {
+                Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+
+        // For direct JIRA mentions, we want to update the PR
+        // with the GH issue #? Unfortunately when 
+        // you add an external link to a JIRA issue it doesn't send an 
+        // issue update out. It seems as though editing a PR in GH doesn't
+        // send out a update notice which is kinda annoying on one hand,
+        // but should work well here. 
+
+        GithubConnector ghConn = new GithubConnector(config.getGithub().getUsername(),
+                                                   config.getGithub().getPassword());
+
+        for (String jKey : directJiraMentions)
+        {
+            try
+            {
+                // Get GH issue number from issue in JIRA
+                GetIssue get = new GetIssue.Builder().withIssueKey(jKey).build();
+                JiraEvent.Issue issue = conn.execute(get);
+                // update this PR body with the GH issue number
+                if (issue.hasGithubIssueNumber())
+                {
+                    body = body.replace(jKey, jKey + " (#" + issue.getGithubIssueNumber() +")");
+                    UpdatePullRequest update = 
+                        new UpdatePullRequest.Builder()
+                            .withRepository(repo)
+                            .withPullRequestNumber(event.getPullRequest().getNumber())
+                            .withBody(body)
+                            .build();
+
+                    ghConn.execute(update);
+                }
+
+            }
+            catch (ExecutionException ex)
+            {
+                Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        
+    }
+    
     private void processCreatedEvent(GithubEvent event)
     {
         JiraConnector conn = new JiraConnector(config.getJira().getUsername(),
                                                config.getJira().getPassword());
         
-        if (event.hasComment())
+        if (event.hasIssue() && event.hasComment())
         {
-            String body = event.getComment().getBody();
-            Matcher m = jiraCommentPattern.matcher(body);
-        
-            if (!m.find())
+            if (event.getIssue().isReallyAPullRequest())
             {
-                // Comment originating on GH, post to JIRA
-                
-                // The JIRA issue key is in the title
-                String issueTitle = event.getIssue().getTitle();
-                m = jiraIssuePattern.matcher(issueTitle);
-                if (m.find())
+                // Allow comments on pull requests to link to an issue
+                linkPullRequestToIssue(conn, event);
+            }
+            else
+            {
+                String body = event.getComment().getBody();
+                Matcher m = jiraCommentPattern.matcher(body);
+
+                if (!m.find())
                 {
-                    body = body + " \n\n[posted via Github by " +
-                        event.getComment().getUser().getLogin() +
-                        "]";
-                    
-                    
-                    PostComment post = 
-                        new PostComment.Builder()
-                            .withIssueKey(m.group(1))
-                            .withComment(body)
-                            .build();
-                    try
+                    // Comment originating on GH, post to JIRA
+
+                    // The JIRA issue key is in the title
+                    String issueTitle = event.getIssue().getTitle();
+                    m = jiraIssuePattern.matcher(issueTitle);
+                    if (m.find())
                     {
-                        conn.execute(post);
+                        body = body + " \n\n[posted via Github by " +
+                            event.getComment().getUser().getLogin() +
+                            "]";
+
+
+                        PostComment post = 
+                            new PostComment.Builder()
+                                .withIssueKey(m.group(1))
+                                .withComment(body)
+                                .build();
+                        try
+                        {
+                            conn.execute(post);
+                        }
+                        catch (ExecutionException ex)
+                        {
+                            Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+
                     }
-                    catch (ExecutionException ex)
-                    {
-                        Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                    
+
                 }
-                
             }
             
         }
