@@ -47,6 +47,18 @@ public class UpdateIssue extends CreateIssue
                            
     }
     
+    @Override
+    public int getExpectedResponseCode()
+    {
+        return 204; // JIRA docs are wrong, say 200
+    }
+    
+    @Override
+    public String processResponse(String jsonResponse)
+    {
+        return"{}";
+    }
+    
     protected abstract static class Init<T extends Init<T>> extends CreateIssue.Init<T>
     {
         private String jiraIssueKey;

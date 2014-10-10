@@ -17,5 +17,5 @@ limitations under the License.
 
 
 <Context>
-    <Environment name="configurationPath" value="/usr/share/tomcat7/jira-github-service.xml" type="java.lang.String"/>
+    <Environment name="configurationPath" value="/usr/share/tomcat7/jira-github-service-1.1.xml" type="java.lang.String"/>
 </Context>

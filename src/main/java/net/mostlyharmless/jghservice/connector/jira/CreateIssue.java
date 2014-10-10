@@ -20,7 +20,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.NumericNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -38,8 +40,7 @@ public class CreateIssue implements JiraCommand<String>
     protected final String issuetype;
     protected final String summary;
     protected final String description;
-    protected final Map<String, String> customSingleFields = new HashMap<>();
-    protected final Map<String, ObjectNode> customObjectFields = new HashMap<>();
+    protected final Map<String, JsonNode> customFields = new HashMap<>();
     
     protected CreateIssue(Init<?> builder)
     {
@@ -47,8 +48,7 @@ public class CreateIssue implements JiraCommand<String>
         this.issuetype = builder.issuetype;
         this.summary = builder.summary;
         this.description = builder.description;
-        this.customSingleFields.putAll(builder.customSingleFields);
-        this.customObjectFields.putAll(builder.customObjectFields);
+        this.customFields.putAll(builder.customFields);
     }
     
     @Override
@@ -89,12 +89,7 @@ public class CreateIssue implements JiraCommand<String>
             fields.put("description", description);
         }
         
-        for (Map.Entry<String, String> entry : customSingleFields.entrySet())
-        {
-            fields.put(entry.getKey(), entry.getValue());
-        }
-        
-        for (Map.Entry<String, ObjectNode> entry : customObjectFields.entrySet())
+        for (Map.Entry<String, JsonNode> entry : customFields.entrySet())
         {
             fields.put(entry.getKey(), entry.getValue());
         }
@@ -128,8 +123,7 @@ public class CreateIssue implements JiraCommand<String>
     {
         private String projectKey;
         private String issuetype;
-        private final Map<String, String> customSingleFields = new HashMap<>();
-        private final Map<String, ObjectNode> customObjectFields = new HashMap<>();
+        private final Map<String, JsonNode> customFields = new HashMap<>();
         private String summary;
         private String description;
         
@@ -159,20 +153,41 @@ public class CreateIssue implements JiraCommand<String>
         
         public T withCustomField(String fieldname, String value)
         {
-            customSingleFields.put(fieldname, value);
+            TextNode text = JsonNodeFactory.instance.textNode(value);
+            customFields.put(fieldname, text);
+            return self();
+        }
+        
+        public T withCustomField(String fieldname, int value)
+        {
+            NumericNode number = JsonNodeFactory.instance.numberNode(value);
+            customFields.put(fieldname, number);
             return self();
         }
         
         public T withCustomField(String fieldName, String key, String value)
         {
-            ObjectNode fieldNode = customObjectFields.get(fieldName);
-            if (fieldNode == null)
+            JsonNode fieldNode = customFields.get(fieldName);
+            if (fieldNode == null || !fieldNode.isObject())
             {
                 fieldNode = JsonNodeFactory.instance.objectNode();
-                customObjectFields.put(fieldName, fieldNode);
+                customFields.put(fieldName, fieldNode);
             }
 
-            fieldNode.put(key, value);
+            ((ObjectNode)fieldNode).put(key, value);
+            return self();
+        }
+        
+        public T withCustomField(String fieldName, String key, int value)
+        {
+            JsonNode fieldNode = customFields.get(fieldName);
+            if (fieldNode == null || !fieldNode.isObject())
+            {
+                fieldNode = JsonNodeFactory.instance.objectNode();
+                customFields.put(fieldName, fieldNode);
+            }
+
+            ((ObjectNode)fieldNode).put(key, value);
             return self();
         }
         

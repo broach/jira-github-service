@@ -16,6 +16,8 @@
 
 package net.mostlyharmless.jghservice.resources.github;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  *
  * @author Brian Roach <roach at mostlyharmless dot net>
@@ -23,9 +25,15 @@ package net.mostlyharmless.jghservice.resources.github;
 public class GithubEvent
 {
 
+    @JsonProperty
     private String action;
+    @JsonProperty
     private Issue issue;
+    @JsonProperty("pull_request")
+    private PullRequest pullRequest;
+    @JsonProperty
     private Repository repository;
+    @JsonProperty
     private Comment comment;
         
     public String getAction()
@@ -33,29 +41,29 @@ public class GithubEvent
         return action;
     }
 
-    public void setAction(String action)
+    public boolean hasIssue()
     {
-        this.action = action;
+        return issue != null;
     }
-
+    
     public Issue getIssue()
     {
         return issue;
     }
 
-    public void setIssue(Issue issue)
+    public boolean hasPullRequest()
     {
-        this.issue = issue;
+        return pullRequest != null;
     }
-
+    
+    public PullRequest getPullRequest()
+    {
+        return pullRequest;
+    }
+    
     public Repository getRepository()
     {
         return repository;
-    }
-
-    public void setRepository(Repository repo)
-    {
-        this.repository = repo;
     }
 
     public Comment getComment()
@@ -63,11 +71,6 @@ public class GithubEvent
         return comment;
     }
 
-    public void setComment(Comment comment)
-    {
-        this.comment = comment;
-    }
-    
     public boolean hasComment()
     {
         return comment != null;
@@ -75,18 +78,18 @@ public class GithubEvent
     
     public static class Issue
     {
+        @JsonProperty
         private String title;
+        @JsonProperty
         private int number;
+        @JsonProperty
         private String body;
+        @JsonProperty
+        private String html_url;
 
         public String getTitle()
         {
             return title;
-        }
-
-        public void setTitle(String title)
-        {
-            this.title = title;
         }
 
         public int getNumber()
@@ -94,9 +97,36 @@ public class GithubEvent
             return number;
         }
 
-        public void setNumber(int number)
+        public String getBody()
         {
-            this.number = number;
+            return body;
+        }
+
+        public String getUrl()
+        {
+            return html_url;
+        }
+    }
+    
+    public static class PullRequest
+    {
+        @JsonProperty
+        private String title;
+        @JsonProperty
+        private int number;
+        @JsonProperty
+        private String body;
+        @JsonProperty
+        private String html_url;
+
+        public String getTitle()
+        {
+            return title;
+        }
+
+        public int getNumber()
+        {
+            return number;
         }
 
         public String getBody()
@@ -104,16 +134,16 @@ public class GithubEvent
             return body;
         }
 
-        public void setBody(String body)
+        public String getUrl()
         {
-            this.body = body;
+            return html_url;
         }
-        
         
     }
     
     public static class Repository
     {
+        @JsonProperty
         private String name;
 
         public String getName()
@@ -121,15 +151,13 @@ public class GithubEvent
             return name;
         }
 
-        public void setName(String name)
-        {
-            this.name = name;
-        }
     }
     
     public static class Comment
     {
+        @JsonProperty
         private String body;
+        @JsonProperty
         private User user;
 
         public String getBody()
@@ -137,35 +165,20 @@ public class GithubEvent
             return body;
         }
 
-        public void setBody(String body)
-        {
-            this.body = body;
-        }
-
         public User getUser()
         {
             return user;
         }
 
-        public void setUser(User user)
-        {
-            this.user = user;
-        }
-        
         public static class User
         {
+            @JsonProperty
             private String login;
 
             public String getLogin()
             {
                 return login;
             }
-
-            public void setLogin(String login)
-            {
-                this.login = login;
-            }
-            
         }
     }
     

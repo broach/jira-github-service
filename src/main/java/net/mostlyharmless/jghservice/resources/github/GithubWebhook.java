@@ -16,6 +16,8 @@
 
 package net.mostlyharmless.jghservice.resources.github;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,11 +30,17 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import net.mostlyharmless.jghservice.connector.github.GithubConnector;
+import net.mostlyharmless.jghservice.connector.github.UpdatePullRequest;
+import net.mostlyharmless.jghservice.connector.jira.AddExternalLinkToIssue;
 import net.mostlyharmless.jghservice.connector.jira.CreateIssue;
+import net.mostlyharmless.jghservice.connector.jira.GetIssue;
 import net.mostlyharmless.jghservice.connector.jira.JiraConnector;
 import net.mostlyharmless.jghservice.connector.jira.PostComment;
+import net.mostlyharmless.jghservice.connector.jira.SearchIssues;
 import net.mostlyharmless.jghservice.connector.jira.UpdateIssue;
 import net.mostlyharmless.jghservice.resources.ServiceConfig;
+import net.mostlyharmless.jghservice.resources.jira.JiraEvent;
 
 /**
  *
@@ -47,7 +55,13 @@ public class GithubWebhook
     private static final Pattern jiraIssuePattern = 
         Pattern.compile("\\[JIRA: ([-A-Z0-9]+)\\]");
     private final Pattern jiraCommentPattern =
-            Pattern.compile("\\[posted via JIRA by .+\\]\\*\\*\\*$");
+        Pattern.compile("\\[posted via JIRA by .+\\]\\*\\*\\*$");
+    private final Pattern githubIssueMention =
+        Pattern.compile("#(\\d+)");
+    private final Pattern jiraIssueMention =
+        Pattern.compile("(([A-Z]+)-\\d+)");
+    private final Pattern extractCustomFieldNumber =
+        Pattern.compile("customfield_(\\d+)");
     
     private static final String GITHUB_ISSUE_OPENED = "opened";
     private static final String GITHUB_COMMENT_CREATED = "created";
@@ -77,71 +91,230 @@ public class GithubWebhook
         JiraConnector conn = new JiraConnector(config.getJira().getUsername(),
                                                config.getJira().getPassword());
         
-        String title = event.getIssue().getTitle();
-        Matcher m = jiraIssuePattern.matcher(title);
-        if (m.find())
+        
+        if (event.hasIssue())
         {
-            // Originated from JIRA, need to update JIRA with issue number
-            
-            String githubIssueField = config.getJira().getGithubIssueNumberField();
-            
-            UpdateIssue update = 
-                new UpdateIssue.Builder()
-                    .withCustomField(githubIssueField, String.valueOf(event.getIssue().getNumber()))
-                    .withJiraIssueKey(m.group(1))
-                    .build();
-            try
+            String title = event.getIssue().getTitle();
+            Matcher m = jiraIssuePattern.matcher(title);
+            if (m.find())
             {
-                conn.execute(update);
+                // Originated from JIRA, need to update JIRA with issue number and external link
+
+                String githubIssueField = config.getJira().getGithubIssueNumberField();
+                String jiraIssueKey = m.group(1);
+
+                UpdateIssue update = 
+                    new UpdateIssue.Builder()
+                        .withCustomField(githubIssueField, event.getIssue().getNumber())
+                        .withJiraIssueKey(jiraIssueKey)
+                        .build();
+                try
+                {
+                    conn.execute(update);
+                    createExternalLink(conn, jiraIssueKey, event);
+                }
+                catch (ExecutionException ex)
+                {
+                    Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
-            catch (ExecutionException ex)
+            else
             {
-                Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                // Originated in github. Create in JIRA and add external link
+
+                String githubIssueField = config.getJira().getGithubIssueNumberField();
+                String jiraRepoField = config.getJira().getGithubRepoNameField();
+                ServiceConfig.Repository repo = 
+                    config.getRepoForGithubName(event.getRepository().getName());
+
+                String jiraProjectKey = repo.getJiraProjectKey();
+                String jiraRepoName = repo.getJiraName();
+                int githubIssueNumber = event.getIssue().getNumber();
+
+                CreateIssue.Builder builder = 
+                    new CreateIssue.Builder()
+                        .withProjectKey(jiraProjectKey)
+                        .withIssuetype("Task")
+                        .withSummary(event.getIssue().getTitle())
+                        .withDescription(event.getIssue().getBody())
+                        .withCustomField(githubIssueField, githubIssueNumber)
+                        .withCustomField(jiraRepoField, "value", jiraRepoName);
+
+                // populate any custom fields from repo config
+                for (ServiceConfig.Repository.JiraField field : repo.getJiraFields())
+                {
+                    if (field.getType().equals("object"))
+                    {
+                        builder.withCustomField(field.getName(), field.getKey(), field.getValue());
+                    }
+                    else
+                    {
+                        builder.withCustomField(field.getName(), field.getValue());
+                    }
+                }
+
+                try
+                {
+                    String jiraKey = conn.execute(builder.build());
+                    createExternalLink(conn, jiraKey, event);
+                }
+                catch (ExecutionException ex)
+                {
+                    Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
+        }
+        else if (event.hasPullRequest())
+        {
+            // PR created, see if it mentions a GH isse or JIRA issue
+            // If it does, update in JIRA. 
+            String body = event.getPullRequest().getBody();
+
+            // Scan body for Github issue mentions. Github does *not* notify 
+            // via the webhook when it updates an issue with a PR link due to
+            // a mention (or note it in the PR or issue metadata)
+            Matcher m = githubIssueMention.matcher(body);
+            List<String> ghIssueNumbers = new LinkedList<>();
+            while (m.find())
+            {
+                ghIssueNumbers.add(m.group(1));
+            }
+
+            // Scan body for direct JIRA issue key mentions. 
+            List<String> directJiraMentions = new LinkedList<>();
+            m = jiraIssueMention.matcher(body);
+            while (m.find())
+            {
+                if (config.getProjectKeys().contains(m.group(2)))
+                {
+                    directJiraMentions.add(m.group(1));
+                }
+            }
+
+            // For GH issues, we have to query JIRA and get back the issue
+            // keys that have the issue in the github issue id field and add those
+            // to the jira keys. 
+            List<String> ghIssueMentions = new LinkedList<>();
+
+            // Of course, they can't make this easy. Querying custom fields
+            // requires a format of cf[xxxx] rather than, you know, the field
+            // name.
+            m = extractCustomFieldNumber.matcher(config.getJira().getGithubIssueNumberField());
+            m.find();
+            String cfNumber = m.group(1);
+            ServiceConfig.Repository repo = 
+                config.getRepoForGithubName(event.getRepository().getName());
+            String jiraProjectKey = repo.getJiraProjectKey();
+
+            for (String ghIssueNum : ghIssueNumbers)
+            {
+                String jql = "project = " + jiraProjectKey +
+                        " and cf[" + cfNumber +
+                        "] = " + ghIssueNum;
+
+                SearchIssues search = 
+                    new SearchIssues.Builder()
+                        .withJQL(jql)
+                        .build();
+                try
+                {
+                    List<JiraEvent.Issue> issues = conn.execute(search);
+                    for (JiraEvent.Issue issue : issues)
+                    {
+                        ghIssueMentions.add(issue.getJiraIssueKey());
+                    }
+                }
+                catch (ExecutionException ex)
+                {
+                    Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+
+            // Now we have all the JIRA issues mentioned in this PR, either
+            // directly or indirectly. Update them with the link to the PR
+            List<String> jiraIssueKeys = new LinkedList<>();
+            jiraIssueKeys.addAll(directJiraMentions);
+            jiraIssueKeys.addAll(ghIssueMentions);
+            for (String jKey : jiraIssueKeys)
+            {
+                try
+                {
+                    createExternalLink(conn, jKey, event);
+                }
+                catch (ExecutionException ex)
+                {
+                    Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+
+            // For direct JIRA mentions, we want to update the PR
+            // with the GH issue #? Unfortunately when 
+            // you add an external link to a JIRA issue it doesn't send an 
+            // issue update out. It seems as though editing a PR in GH doesn't
+            // send out a update notice which is kinda annoying on one hand,
+            // but should work well here. 
+            
+            GithubConnector ghConn = new GithubConnector(config.getGithub().getUsername(),
+                                                       config.getGithub().getPassword());
+            
+            for (String jKey : directJiraMentions)
+            {
+                try
+                {
+                    // Get GH issue number from issue in JIRA
+                    GetIssue get = new GetIssue.Builder().withIssueKey(jKey).build();
+                    JiraEvent.Issue issue = conn.execute(get);
+                    // update this PR body with the GH issue number
+                    if (issue.hasGithubIssueNumber())
+                    {
+                        body = body.replace(jKey, jKey + " (#" + issue.getGithubIssueNumber() +")");
+                        UpdatePullRequest update = 
+                            new UpdatePullRequest.Builder()
+                                .withRepository(repo)
+                                .withPullRequestNumber(event.getPullRequest().getNumber())
+                                .withBody(body)
+                                .build();
+                        
+                        ghConn.execute(update);
+                    }
+                    
+                }
+                catch (ExecutionException ex)
+                {
+                    Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            
+
+
+        }
+    }
+    
+    private void createExternalLink(JiraConnector conn, String jiraIssueKey, GithubEvent event) throws ExecutionException
+    {
+        AddExternalLinkToIssue.Builder builder = 
+            new AddExternalLinkToIssue.Builder()
+                .withJiraIssueKey(jiraIssueKey);
+        
+        if (event.hasIssue())
+        {
+            GithubEvent.Issue issue = event.getIssue();
+            builder.withRelationship("issue")
+                .withTitle(issue.getTitle())
+                .withUrl(issue.getUrl());
         }
         else
         {
-            // Originated in github. Create in JIRA
-            
-            String githubIssueField = config.getJira().getGithubIssueNumberField();
-            String jiraRepoField = config.getJira().getGithubRepoNameField();
-            ServiceConfig.Repository repo = 
-                config.getRepoForGithubName(event.getRepository().getName());
-            
-            String jiraProjectKey = repo.getJiraProjectKey();
-            String jiraRepoName = repo.getJiraName();
-            String githubIssueNumber = String.valueOf(event.getIssue().getNumber());
-            
-            CreateIssue.Builder builder = 
-                new CreateIssue.Builder()
-                    .withProjectKey(jiraProjectKey)
-                    .withIssuetype("Task")
-                    .withSummary(event.getIssue().getTitle())
-                    .withDescription(event.getIssue().getBody())
-                    .withCustomField(githubIssueField, githubIssueNumber)
-                    .withCustomField(jiraRepoField, "value", jiraRepoName);
-            
-            // populate any custom fields from repo config
-            for (ServiceConfig.Repository.JiraField field : repo.getJiraFields())
-            {
-                if (field.getType().equals("object"))
-                {
-                    builder.withCustomField(field.getName(), field.getKey(), field.getValue());
-                }
-                else
-                {
-                    builder.withCustomField(field.getName(), field.getValue());
-                }
-            }
-            try
-            {
-                conn.execute(builder.build());
-            }
-            catch (ExecutionException ex)
-            {
-                Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            GithubEvent.PullRequest pr = event.getPullRequest();
+            builder.withRelationship("pull request")
+                .withTitle(pr.getTitle())
+                .withUrl(pr.getUrl());
         }
+        
+        AddExternalLinkToIssue add = builder.build();
+        
+        conn.execute(add);
+                
     }
     
     private void processCreatedEvent(GithubEvent event)
@@ -163,7 +336,7 @@ public class GithubWebhook
                 m = jiraIssuePattern.matcher(issueTitle);
                 if (m.find())
                 {
-                    body = body + " \n[posted via Github by " +
+                    body = body + " \n\n[posted via Github by " +
                         event.getComment().getUser().getLogin() +
                         "]";
                     
