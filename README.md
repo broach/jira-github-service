@@ -19,3 +19,4 @@ See the `configExample` file for configuration. Note you must have the `context.
 ### Pull Requests
 * Mention in body via either Github's #xxx or JIRA's PROJECT-xxx creates external link on JIRA issue.
 * JIRA's PROJECT-xxx mention will automatically cause Github's #xxx to be added to body and show up on linked issue.
+* If you forget to add it to the body, a comment on the PR will now also trigger linking. 
