@@ -21,6 +21,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.inject.Singleton;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
@@ -28,6 +31,8 @@ import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlAdapter;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import net.mostlyharmless.jghservice.connector.jira.GetProjectKeys;
+import net.mostlyharmless.jghservice.connector.jira.JiraConnector;
 
 /**
  *
@@ -44,6 +49,8 @@ public class ServiceConfig
     @XmlElement(name="repositories")
     @XmlJavaTypeAdapter(RepositoryAdapter.class)
     private Map<String, Map<String,Repository>> repositories;
+    
+    private List<String> jiraProjectNames;
     
     public Github getGithub()
     {
@@ -75,6 +82,27 @@ public class ServiceConfig
         return list;
     }
     
+    public synchronized List<String> getProjectKeys()
+    {
+        if (null == jiraProjectNames)
+        {
+            JiraConnector conn = new JiraConnector(jira.getUsername(), jira.getPassword());
+            
+            GetProjectKeys get = new GetProjectKeys.Builder().build();
+            try
+            {
+                jiraProjectNames = conn.execute(get);
+            }
+            catch (ExecutionException ex)
+            {
+                Logger.getLogger(ServiceConfig.class.getName()).log(Level.SEVERE, "getProjectKeys() failed", ex);
+            }
+            
+        }
+        
+        return jiraProjectNames;
+        
+    }
     
     public static class Jira
     {

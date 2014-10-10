@@ -87,7 +87,7 @@ public class JiraWebhook
             GithubConnector conn = new GithubConnector(config.getGithub().getUsername(),
                                                        config.getGithub().getPassword());
             
-            if (event.getIssue().getGithubIssueNumber() == null)
+            if (!event.getIssue().hasGithubIssueNumber())
             {
                 // Originating in Jira if there's no GH #
                 // Create a new issue in GH
@@ -159,7 +159,7 @@ public class JiraWebhook
                 {
                     // Comment was created on JIRA, post to GH 
                     JiraEvent.Comment c = event.getComment();
-                    body = body + " \n***[posted via JIRA by " + 
+                    body = body + " \n\n***[posted via JIRA by " + 
                         c.getAuthor().getDisplayName() + "]***";
                     
                     PostComment post = 
@@ -187,7 +187,7 @@ public class JiraWebhook
                     if (item.getField().equals("status"))
                     {
                         // Status change in JIRA, update GH issue
-                        String ghIssueNumber = 
+                        int ghIssueNumber = 
                             event.getIssue().getGithubIssueNumber();
                         
                         GetLabelsOnIssue getLabels =

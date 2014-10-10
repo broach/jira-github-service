@@ -92,12 +92,12 @@ public class JiraEvent
         private final String summary;
         private final String description;
         //@JsonProperty("customfield_10025")
-        private final String githubIssueNumber;
+        private final int githubIssueNumber;
         // @JsonProperty("customfield_10500")
         private final String githubRepo;
         
         public Issue(String key, String summary, String description, 
-                                                 String ghIssueNumber,
+                                                 int ghIssueNumber,
                                                  String ghRepo)
         {
             this.jiraIssueKey = key;
@@ -133,14 +133,14 @@ public class JiraEvent
             return description;
         }
 
-        public String getGithubIssueNumber()
+        public int getGithubIssueNumber()
         {
             return githubIssueNumber;
         }
 
         public boolean hasGithubIssueNumber()
         {
-            return githubIssueNumber != null;
+            return githubIssueNumber != 0;
         }
         
         public static class Deserializer extends JsonDeserializer<Issue>
@@ -153,8 +153,10 @@ public class JiraEvent
                 node = node.get("fields");
                 String summary = node.get("summary").textValue();
                 String description = node.get("description").textValue();
+                // TODO: This needs to be changed so that all custom fields are
+                // pulled and stored in a map, or something ... 
                 String ghRepo = node.get("customfield_10500").get("value").textValue();
-                String ghIssueNumber = node.get("customfield_10025").textValue();
+                int ghIssueNumber = node.get("customfield_10501").asInt();
                 
                 return new Issue(key, summary, description, ghIssueNumber, ghRepo);
                 
