@@ -4,7 +4,7 @@
 
     <groupId>net.mostlyharmless</groupId>
     <artifactId>jira-github-service</artifactId>
-    <version>1.3-SNAPSHOT</version>
+    <version>1.2.1-SNAPSHOT</version>
     <packaging>war</packaging>
 
     <name>jira-github-service</name>
