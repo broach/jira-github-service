@@ -32,7 +32,7 @@ public class JiraGithubService extends ResourceConfig
     {
         super(net.mostlyharmless.jghservice.resources.jira.JiraWebhook.class,
               net.mostlyharmless.jghservice.resources.github.GithubWebhook.class,
-              //net.mostlyharmless.jghservice.resources.TestResource.class,
+              net.mostlyharmless.jghservice.resources.TestResource.class,
               ObjectMapperProvider.class,
               JacksonFeature.class);
         

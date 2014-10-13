@@ -18,7 +18,6 @@ package net.mostlyharmless.jghservice.connector.jira;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import static net.mostlyharmless.jghservice.connector.jira.JiraCommand.API_URL_BASE;
 
 /**
  *
@@ -41,9 +40,9 @@ public class UpdateIssue extends CreateIssue
     }
     
     @Override
-    public URL getUrl() throws MalformedURLException
+    public URL getUrl(String apiUrlBase) throws MalformedURLException
     {
-        return new URL(API_URL_BASE + "issue/" + jiraIssueKey);
+        return new URL(apiUrlBase + "issue/" + jiraIssueKey);
                            
     }
     

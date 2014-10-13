@@ -22,7 +22,11 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import net.mostlyharmless.jghservice.resources.ServiceConfig;
 
 /**
  *
@@ -91,31 +95,31 @@ public class JiraEvent
         private final String jiraIssueKey;
         private final String summary;
         private final String description;
-        //@JsonProperty("customfield_10025")
-        private final int githubIssueNumber;
-        // @JsonProperty("customfield_10500")
-        private final String githubRepo;
+        
+        private final Map<String, JsonNode> customFields;
         
         public Issue(String key, String summary, String description, 
-                                                 int ghIssueNumber,
-                                                 String ghRepo)
+                                                 Map<String,JsonNode> customFields)
         {
             this.jiraIssueKey = key;
             this.summary = summary;
             this.description = description;
-            this.githubIssueNumber = ghIssueNumber;
-            this.githubRepo = ghRepo;
+            this.customFields = customFields;
             
         }
         
-        public String getGithubRepo()
+        public String getGithubRepo(ServiceConfig config)
         {
-            return githubRepo;
+            String ghRepoField = config.getJira().getGithubRepoNameField();
+            JsonNode node = customFields.get(ghRepoField);
+            return node.get("value").textValue();
         }
         
-        public boolean hasGithubRepo()
+        public boolean hasGithubRepo(ServiceConfig config)
         {
-            return githubRepo != null;
+            String ghRepoField = config.getJira().getGithubRepoNameField();
+            JsonNode node = customFields.get(ghRepoField);
+            return (node != null && !node.isNull() && node.get("value").isTextual());
         }
 
         public String getJiraIssueKey()
@@ -133,14 +137,18 @@ public class JiraEvent
             return description;
         }
 
-        public int getGithubIssueNumber()
+        public int getGithubIssueNumber(ServiceConfig config)
         {
-            return githubIssueNumber;
+            String ghIssueNumField = config.getJira().getGithubIssueNumberField();
+            JsonNode node = customFields.get(ghIssueNumField);
+            return node.asInt();
         }
 
-        public boolean hasGithubIssueNumber()
+        public boolean hasGithubIssueNumber(ServiceConfig config)
         {
-            return githubIssueNumber != 0;
+            String ghIssueNumField = config.getJira().getGithubIssueNumberField();
+            JsonNode node = customFields.get(ghIssueNumField);
+            return (node != null && !node.isNull() && node.isNumber());
         }
         
         public static class Deserializer extends JsonDeserializer<Issue>
@@ -153,12 +161,20 @@ public class JiraEvent
                 node = node.get("fields");
                 String summary = node.get("summary").textValue();
                 String description = node.get("description").textValue();
-                // TODO: This needs to be changed so that all custom fields are
-                // pulled and stored in a map, or something ... 
-                String ghRepo = node.get("customfield_10500").get("value").textValue();
-                int ghIssueNumber = node.get("customfield_10501").asInt();
                 
-                return new Issue(key, summary, description, ghIssueNumber, ghRepo);
+                // Store the custom fields in a map
+                Map<String, JsonNode> customFields = new HashMap<>();
+                Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+                while (fields.hasNext())
+                {
+                    Map.Entry<String, JsonNode> entry = fields.next();
+                    if (entry.getKey().startsWith("customfield_"))
+                    {
+                        customFields.put(entry.getKey(), entry.getValue());
+                    }
+                }
+                
+                return new Issue(key, summary, description, customFields);
                 
             }
             
