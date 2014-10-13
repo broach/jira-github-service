@@ -47,9 +47,9 @@ public class ModifyComment implements GithubCommand<Integer>
     }
     
     @Override
-    public URL getUrl() throws MalformedURLException
+    public URL getUrl(String apiUrlBase) throws MalformedURLException
     {
-        return new URL(API_URL_BASE +
+        return new URL(apiUrlBase +
                        repo.getGithubOwner() + 
                         "/" + 
                         repo.getGithubName() + 

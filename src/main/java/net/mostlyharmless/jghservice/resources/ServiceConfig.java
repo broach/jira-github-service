@@ -86,7 +86,7 @@ public class ServiceConfig
     {
         if (null == jiraProjectNames)
         {
-            JiraConnector conn = new JiraConnector(jira.getUsername(), jira.getPassword());
+            JiraConnector conn = new JiraConnector(this);
             
             GetProjectKeys get = new GetProjectKeys.Builder().build();
             try

@@ -31,7 +31,6 @@ import java.net.URL;
  */
 public interface GithubCommand<T>
 {
-    final static String API_URL_BASE = "https://api.github.com/repos/";
     final static String POST = "POST";
     final static String PUT = "PUT";
     final static String GET = "GET";
@@ -41,7 +40,7 @@ public interface GithubCommand<T>
         .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
         .setSerializationInclusion(JsonInclude.Include.NON_NULL);
     
-    URL getUrl() throws MalformedURLException;
+    URL getUrl(String apiUrlBase) throws MalformedURLException;
     String getJson() throws JsonProcessingException;
     String getRequestMethod();
     int getExpectedResponseCode();

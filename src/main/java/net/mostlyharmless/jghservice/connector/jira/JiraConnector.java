@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import javax.xml.bind.DatatypeConverter;
 import net.mostlyharmless.jghservice.connector.UnexpectedResponseException;
 import net.mostlyharmless.jghservice.connector.github.GithubCommand;
+import net.mostlyharmless.jghservice.resources.ServiceConfig;
 
 /**
  *
@@ -33,17 +34,30 @@ import net.mostlyharmless.jghservice.connector.github.GithubCommand;
 public class JiraConnector
 {
     private final String encodedUserPass;
+    private final String apiUrlBase;
     
-    public JiraConnector(String username, String password)
+    public JiraConnector(ServiceConfig config)
     {
-        encodedUserPass = DatatypeConverter.printBase64Binary((username + ":" + password).getBytes());
+        encodedUserPass = 
+            DatatypeConverter.printBase64Binary((config.getJira().getUsername() 
+                                                 + ":" 
+                                                 + config.getJira().getPassword())
+                                                .getBytes());
+        String base = config.getJira().getUrl();
+        if (!base.endsWith("/"))
+        {
+            base = base + "/";
+        }
+        
+        apiUrlBase = base;
+        
     }
     
     public <T> T execute(JiraCommand<T> command) throws ExecutionException
     {
         try
         {
-            HttpURLConnection conn = (HttpURLConnection) command.getUrl().openConnection();
+            HttpURLConnection conn = (HttpURLConnection) command.getUrl(apiUrlBase).openConnection();
             conn.setRequestMethod(command.getRequestMethod());
             conn.setRequestProperty("Authorization", "Basic " + encodedUserPass);
             conn.setDoOutput(true);

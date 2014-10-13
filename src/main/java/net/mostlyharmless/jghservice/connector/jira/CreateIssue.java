@@ -52,9 +52,9 @@ public class CreateIssue implements JiraCommand<String>
     }
     
     @Override
-    public URL getUrl() throws MalformedURLException
+    public URL getUrl(String apiUrlBase) throws MalformedURLException
     {
-        return new URL(API_URL_BASE + "issue");
+        return new URL(apiUrlBase + "issue");
                            
     }
 

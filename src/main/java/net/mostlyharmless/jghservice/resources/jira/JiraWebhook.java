@@ -77,17 +77,16 @@ public class JiraWebhook
     {
         // If there's no mapped repo (or "Do Not Link To Repo") ... 
         // we don't care about this.
-        String ghRepo = event.getIssue().getGithubRepo();
+        String ghRepo = event.getIssue().getGithubRepo(config);
         ServiceConfig.Repository repository = 
             config.getRepoForJiraName(ghRepo);
         
         if (repository != null)
         {
             
-            GithubConnector conn = new GithubConnector(config.getGithub().getUsername(),
-                                                       config.getGithub().getPassword());
+            GithubConnector conn = new GithubConnector(config);
             
-            if (!event.getIssue().hasGithubIssueNumber())
+            if (!event.getIssue().hasGithubIssueNumber(config))
             {
                 // Originating in Jira if there's no GH #
                 // Create a new issue in GH
@@ -123,7 +122,7 @@ public class JiraWebhook
                 ModifyIssue modify =
                     new ModifyIssue.Builder()
                         .withTitle(title)
-                        .withIssueNumber(event.getIssue().getGithubIssueNumber())
+                        .withIssueNumber(event.getIssue().getGithubIssueNumber(config))
                         .addLabel("JIRA: To Do")
                         .withRepository(repository)
                         .build();
@@ -142,14 +141,13 @@ public class JiraWebhook
     private void processUpdateEvent(JiraEvent event)
     {
         // If there's no repo (or "Do Not Link To Repo") ... we don't care about this.
-        String ghRepo = event.getIssue().getGithubRepo();
+        String ghRepo = event.getIssue().getGithubRepo(config);
         ServiceConfig.Repository repository = 
             config.getRepoForJiraName(ghRepo);
         
         if (repository != null)
         {
-            GithubConnector conn = new GithubConnector(config.getGithub().getUsername(),
-                                                       config.getGithub().getPassword());
+            GithubConnector conn = new GithubConnector(config);
             if (event.hasComment())
             {
                 String body = event.getComment().getBody();
@@ -165,7 +163,7 @@ public class JiraWebhook
                     PostComment post = 
                         new PostComment.Builder()
                             .withBody(body)
-                            .withIssueNumber(event.getIssue().getGithubIssueNumber())
+                            .withIssueNumber(event.getIssue().getGithubIssueNumber(config))
                             .withRepo(repository)
                             .build();
                     try
@@ -188,7 +186,7 @@ public class JiraWebhook
                     {
                         // Status change in JIRA, update GH issue
                         int ghIssueNumber = 
-                            event.getIssue().getGithubIssueNumber();
+                            event.getIssue().getGithubIssueNumber(config);
                         
                         GetLabelsOnIssue getLabels =
                             new GetLabelsOnIssue.Builder()

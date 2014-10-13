@@ -47,9 +47,9 @@ public class PostComment implements GithubCommand<Integer>
     }
     
     @Override
-    public URL getUrl() throws MalformedURLException
+    public URL getUrl(String apiUrlBase) throws MalformedURLException
     {
-        String urlString =  API_URL_BASE + 
+        String urlString =  apiUrlBase + 
                             repo.getGithubOwner() + 
                             "/" + 
                             repo.getGithubName() + 
