@@ -5,6 +5,8 @@ Web service that sits between Github and JIRA.
 
 See the `configExample` file for configuration. Note you must have the `context.xml` for the webapp pointed at a config.
 
+**Note:** There's still some hard coded values specific to our JIRA setup I need to change to being injected. In short, don't try to use this yet. 
+
 ## Current features
 ### Issues
 * Created in Github -> JIRA
