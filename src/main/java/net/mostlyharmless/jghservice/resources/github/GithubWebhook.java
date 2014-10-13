@@ -91,8 +91,7 @@ public class GithubWebhook
     
     private void processOpenedEvent(GithubEvent event)
     {
-        JiraConnector conn = new JiraConnector(config.getJira().getUsername(),
-                                               config.getJira().getPassword());
+        JiraConnector conn = new JiraConnector(config);
         
         
         if (event.hasIssue())
@@ -319,8 +318,7 @@ public class GithubWebhook
         // send out a update notice which is kinda annoying on one hand,
         // but should work well here. 
 
-        GithubConnector ghConn = new GithubConnector(config.getGithub().getUsername(),
-                                                   config.getGithub().getPassword());
+        GithubConnector ghConn = new GithubConnector(config);
 
         for (String jKey : jiraIssueKeys)
         {
@@ -337,9 +335,9 @@ public class GithubWebhook
                     GetIssue get = new GetIssue.Builder().withIssueKey(jKey).build();
                     JiraEvent.Issue issue = conn.execute(get);
                     // update this PR body with the GH issue number
-                    if (issue.hasGithubIssueNumber())
+                    if (issue.hasGithubIssueNumber(config))
                     {
-                        body = body.replace(jKey, jKey + " (#" + issue.getGithubIssueNumber() +")");
+                        body = body.replace(jKey, jKey + " (#" + issue.getGithubIssueNumber(config) +")");
                     }
                 }
                 
@@ -380,8 +378,7 @@ public class GithubWebhook
     
     private void processCreatedEvent(GithubEvent event)
     {
-        JiraConnector conn = new JiraConnector(config.getJira().getUsername(),
-                                               config.getJira().getPassword());
+        JiraConnector conn = new JiraConnector(config);
         
         if (event.hasIssue() && event.hasComment())
         {

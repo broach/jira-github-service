@@ -44,9 +44,9 @@ public class SearchIssues implements JiraCommand<List<JiraEvent.Issue>>
     }
 
     @Override
-    public URL getUrl() throws MalformedURLException
+    public URL getUrl(String apiUrlBase) throws MalformedURLException
     {
-        return new URL(API_URL_BASE + "search");
+        return new URL(apiUrlBase + "search");
     }
 
     @Override

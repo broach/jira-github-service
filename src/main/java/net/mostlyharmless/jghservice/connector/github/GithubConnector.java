@@ -24,6 +24,7 @@ import java.net.HttpURLConnection;
 import java.util.concurrent.ExecutionException;
 import javax.xml.bind.DatatypeConverter;
 import net.mostlyharmless.jghservice.connector.UnexpectedResponseException;
+import net.mostlyharmless.jghservice.resources.ServiceConfig;
 
 /**
  *
@@ -33,11 +34,20 @@ public class GithubConnector
 {
     private final String encodedUserPass;
     private final String userAgentName;
+    private final String apiUrlBase;
     
-    public GithubConnector(String username, String password)
+    public GithubConnector(ServiceConfig config)
     {
-        encodedUserPass = DatatypeConverter.printBase64Binary((username + ":" + password).getBytes());
-        userAgentName = username;
+        encodedUserPass = DatatypeConverter.printBase64Binary((config.getGithub().getUsername() + ":" + config.getGithub().getPassword()).getBytes());
+        userAgentName = config.getGithub().getUsername();
+        
+        String base = config.getGithub().getUrl();
+        if (!base.endsWith("/"))
+        {
+            base = base + "/";
+        }
+        
+        apiUrlBase = base;
     }
     
     public <T> T execute(GithubCommand<T> command) throws ExecutionException
@@ -45,7 +55,7 @@ public class GithubConnector
         
         try
         {
-            HttpURLConnection conn = (HttpURLConnection) command.getUrl().openConnection();
+            HttpURLConnection conn = (HttpURLConnection) command.getUrl(apiUrlBase).openConnection();
             conn.setRequestMethod(command.getRequestMethod());
             conn.setRequestProperty("Authorization", "Basic " + encodedUserPass);
             conn.setRequestProperty("User-Agent", userAgentName);

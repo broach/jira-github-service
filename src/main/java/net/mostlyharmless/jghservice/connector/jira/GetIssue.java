@@ -38,9 +38,9 @@ public class GetIssue implements JiraCommand<JiraEvent.Issue>
     }
     
     @Override
-    public URL getUrl() throws MalformedURLException
+    public URL getUrl(String apiUrlBase) throws MalformedURLException
     {
-        return new URL(API_URL_BASE + "issue/" + issueKey);
+        return new URL(apiUrlBase + "issue/" + issueKey);
     }
 
     @Override

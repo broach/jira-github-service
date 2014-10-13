@@ -43,9 +43,9 @@ public class PostComment implements JiraCommand<String>
     }
     
     @Override
-    public URL getUrl() throws MalformedURLException
+    public URL getUrl(String apiUrlBase) throws MalformedURLException
     {
-        return new URL(API_URL_BASE + "issue/" + jiraIssueKey + "/comment");
+        return new URL(apiUrlBase + "issue/" + jiraIssueKey + "/comment");
     }
 
     @Override

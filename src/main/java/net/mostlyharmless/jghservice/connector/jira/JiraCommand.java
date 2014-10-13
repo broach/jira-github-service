@@ -31,7 +31,6 @@ import java.net.URL;
  */
 public interface JiraCommand<T>
 {
-    final static String API_URL_BASE = "https://bashoeng.atlassian.net/rest/api/2/";
     final static String POST = "POST";
     final static String PUT = "PUT";
     final static String GET = "GET";
@@ -41,7 +40,7 @@ public interface JiraCommand<T>
         .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
         .setSerializationInclusion(JsonInclude.Include.NON_NULL);
     
-    URL getUrl() throws MalformedURLException;
+    URL getUrl(String apiUrlBase) throws MalformedURLException;
     String getJson() throws JsonProcessingException;
     String getRequestMethod();
     int getExpectedResponseCode();
