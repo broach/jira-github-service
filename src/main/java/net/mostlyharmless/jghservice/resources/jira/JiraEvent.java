@@ -16,6 +16,7 @@
 
 package net.mostlyharmless.jghservice.resources.jira;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -38,6 +39,7 @@ public class JiraEvent
     private Issue issue;
     private ChangeLog changelog;
     private Comment comment;
+    private User user;
     
     public String getWebhookEvent()
     {
@@ -87,6 +89,21 @@ public class JiraEvent
     public boolean hasComment()
     {
         return comment != null;
+    }
+    
+    public boolean hasUser()
+    {
+        return user != null;
+    }
+    
+    public User getUser()
+    {
+        return user;
+    }
+    
+    public void setUser(User user)
+    {
+        this.user = user;
     }
     
     
@@ -330,5 +347,16 @@ public class JiraEvent
             
         }
         
+    }
+    
+    public static class User
+    {
+        @JsonProperty
+        private String displayName;
+        
+        public String getDisplayName()
+        {
+            return displayName;
+        }
     }
 }

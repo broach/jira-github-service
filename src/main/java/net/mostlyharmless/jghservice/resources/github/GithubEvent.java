@@ -89,6 +89,8 @@ public class GithubEvent
         // Because github can't decide what an issue actually is
         @JsonProperty("pull_request")
         private PullRequest pullRequest;
+        @JsonProperty
+        private User user;
 
         public String getTitle()
         {
@@ -113,6 +115,11 @@ public class GithubEvent
         public boolean isReallyAPullRequest()
         {
             return pullRequest != null;
+        }
+        
+        public User getUser()
+        {
+            return user;
         }
     }
     
@@ -194,6 +201,17 @@ public class GithubEvent
             {
                 return login;
             }
+        }
+    }
+    
+    public static class User
+    {
+        @JsonProperty
+        private String login;
+        
+        public String getLogin()
+        {
+            return login;
         }
     }
     

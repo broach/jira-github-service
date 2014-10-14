@@ -133,12 +133,17 @@ public class GithubWebhook
                 String jiraRepoName = repo.getJiraName();
                 int githubIssueNumber = event.getIssue().getNumber();
 
+                String body = event.getIssue().getBody() +
+                                "\n\n[Created in Github by " +
+                                event.getIssue().getUser().getLogin() +
+                                " ]";
+                
                 CreateIssue.Builder builder = 
                     new CreateIssue.Builder()
                         .withProjectKey(jiraProjectKey)
                         .withIssuetype("Task")
                         .withSummary(event.getIssue().getTitle())
-                        .withDescription(event.getIssue().getBody())
+                        .withDescription(body)
                         .withCustomField(githubIssueField, githubIssueNumber)
                         .withCustomField(jiraRepoField, "value", jiraRepoName);
 

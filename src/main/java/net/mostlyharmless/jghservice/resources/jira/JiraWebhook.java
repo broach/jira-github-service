@@ -90,15 +90,21 @@ public class JiraWebhook
             {
                 // Originating in Jira if there's no GH #
                 // Create a new issue in GH
-            
+                
                 String title = event.getIssue().getSummary() + 
                                 " [JIRA: " + event.getIssue().getJiraIssueKey() +
                                 "]";
                 
+                String body = event.getIssue().getDescription() +
+                                "\n\n**[Created in JIRA by " +
+                                event.getUser().getDisplayName() +
+                                "]**";
+                                
+                
                 CreateIssue create = 
                     new CreateIssue.Builder()
                         .withTitle(title)
-                        .withBody(event.getIssue().getDescription())
+                        .withBody(body)
                         .addLabel("JIRA: To Do")
                         .withRepository(repository)
                         .build();
