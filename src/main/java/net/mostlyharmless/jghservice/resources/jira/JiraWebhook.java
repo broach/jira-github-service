@@ -97,7 +97,7 @@ public class JiraWebhook
                 
                 String body = event.getIssue().getDescription() +
                                 "\n\n**[Created in JIRA by " +
-                                event.getUser().getDisplayName() +
+                                event.getIssue().getReporter().getDisplayName() +
                                 "]**";
                                 
                 
