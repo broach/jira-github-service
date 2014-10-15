@@ -16,6 +16,7 @@
 
 package net.mostlyharmless.jghservice.resources.jira;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -89,23 +90,24 @@ public class JiraEvent
         return comment != null;
     }
     
-    
     public static class Issue
     {
         private final String jiraIssueKey;
         private final String summary;
         private final String description;
+        private final Reporter reporter;
         
         private final Map<String, JsonNode> customFields;
         
         public Issue(String key, String summary, String description, 
-                                                 Map<String,JsonNode> customFields)
+                                                 Map<String,JsonNode> customFields,
+                                                 Reporter reporter)
         {
             this.jiraIssueKey = key;
             this.summary = summary;
             this.description = description;
             this.customFields = customFields;
-            
+            this.reporter = reporter;
         }
         
         public String getGithubRepo(ServiceConfig config)
@@ -151,6 +153,22 @@ public class JiraEvent
             return (node != null && !node.isNull() && node.isNumber());
         }
         
+        public Reporter getReporter()
+        {
+            return reporter;
+        }
+        
+        public static class Reporter
+        {
+            @JsonProperty
+            private String displayName;
+            
+            public String getDisplayName()
+            {
+                return displayName;
+            }
+        }
+        
         public static class Deserializer extends JsonDeserializer<Issue>
         {
             @Override
@@ -161,6 +179,7 @@ public class JiraEvent
                 node = node.get("fields");
                 String summary = node.get("summary").textValue();
                 String description = node.get("description").textValue();
+                Reporter r = jp.getCodec().treeToValue(node.get("reporter"), Reporter.class);
                 
                 // Store the custom fields in a map
                 Map<String, JsonNode> customFields = new HashMap<>();
@@ -174,7 +193,7 @@ public class JiraEvent
                     }
                 }
                 
-                return new Issue(key, summary, description, customFields);
+                return new Issue(key, summary, description, customFields, r);
                 
             }
             
