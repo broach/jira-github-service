@@ -116,6 +116,10 @@ public class ServiceConfig
         private String githubIssueNumberField;
         @XmlElement
         private String githubRepoNameField;
+        @XmlElement
+        private String epicLinkField;
+        @XmlElement
+        private String epicNameField;
 
         public String getUsername()
         {
@@ -142,7 +146,25 @@ public class ServiceConfig
             return githubRepoNameField;
         }
         
+        public String getEpicLinkField()
+        {
+            return epicLinkField;
+        }
         
+        public boolean hasEpicLinkField()
+        {
+            return epicLinkField != null;
+        }
+        
+        public String getEpicNameField()
+        {
+            return epicNameField;
+        }
+        
+        public boolean hasEpicNameField()
+        {
+            return epicNameField != null;
+        }
         
     }
     
@@ -204,6 +226,8 @@ public class ServiceConfig
         @XmlElementWrapper(name="jiraFields")
         @XmlElement(name="field")
         private List<JiraField> jiraFields;
+        @XmlElement
+        private boolean mapEpicsToMilestones = false;
 
         public String getGithubName()
         {
@@ -230,7 +254,10 @@ public class ServiceConfig
             return jiraFields;
         }
         
-        
+        public boolean mapEpicsToMilestones()
+        {
+            return mapEpicsToMilestones;
+        }
         
         public static class JiraField
         {

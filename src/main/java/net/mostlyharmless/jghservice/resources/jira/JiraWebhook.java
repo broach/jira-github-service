@@ -31,11 +31,16 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import net.mostlyharmless.jghservice.connector.github.CreateIssue;
+import net.mostlyharmless.jghservice.connector.github.CreateMilestone;
 import net.mostlyharmless.jghservice.connector.github.GetLabelsOnIssue;
+import net.mostlyharmless.jghservice.connector.github.GetMilestones;
 import net.mostlyharmless.jghservice.connector.github.GithubConnector;
+import net.mostlyharmless.jghservice.resources.github.GithubEvent.Milestone;
 import net.mostlyharmless.jghservice.connector.github.ModifyIssue;
 import net.mostlyharmless.jghservice.connector.github.PostComment;
 import net.mostlyharmless.jghservice.connector.github.SetLabelsOnIssue;
+import net.mostlyharmless.jghservice.connector.jira.GetIssue;
+import net.mostlyharmless.jghservice.connector.jira.JiraConnector;
 import net.mostlyharmless.jghservice.resources.ServiceConfig;
 
 /**
@@ -99,7 +104,71 @@ public class JiraWebhook
                                 "\n\n**[Created in JIRA by " +
                                 event.getIssue().getReporter().getDisplayName() +
                                 "]**";
+                       
+                Integer milestone = null;
+                if (config.getJira().hasEpicLinkField() && repository.mapEpicsToMilestones())
+                {
+                    /*
+                     * Mapping Epics to Milestones takes a few operations. The 
+                     * event from JIRA will have the JIRA key for the Epic issue. 
+                     * That issue will have to be retrieved, and the title 
+                     * looked up as a milestone in GH. If it doesn't exist, it 
+                     * has to be created in GH. 
+                     */
+                    
+                    if (event.getIssue().hasEpicIssueKey(config))
+                    {
+                        String jiraEpicKey = event.getIssue().getEpicIssueKey(config);
+                        
+                        JiraConnector jConn = new JiraConnector(config);
+                        
+                        GetIssue get = 
+                            new GetIssue.Builder()
+                                .withIssueKey(jiraEpicKey)
+                                .build();
+                        try
+                        {
+                            JiraEvent.Issue epic = jConn.execute(get);
+                            String epicName = epic.getEpicName(config);
+                            
+                            GetMilestones getMs = 
+                                new GetMilestones.Builder()
+                                    .withRepositoy(repository)
+                                    .build();
+                            
+                            List<Milestone> msList = conn.execute(getMs);
+                            
+                            
+                            for (Milestone ms : msList)
+                            {
+                                if (ms.getTitle().equals(epicName))
+                                {
+                                    milestone = ms.getNumber();
+                                    break;
+                                }
+                            }
+                            
+                            if (milestone == null)
+                            {
+                                // Need to create this milestone in GH
+                                CreateMilestone create =
+                                    new CreateMilestone.Builder()
+                                        .withRepository(repository)
+                                        .withTitle(epicName)
+                                        .build();
                                 
+                                milestone = conn.execute(create);
+                            }
+                        }
+                        catch (ExecutionException ex)
+                        {
+                            Logger.getLogger(JiraWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                        
+                        
+                    }
+                    
+                }
                 
                 CreateIssue create = 
                     new CreateIssue.Builder()
@@ -107,6 +176,7 @@ public class JiraWebhook
                         .withBody(body)
                         .addLabel("JIRA: To Do")
                         .withRepository(repository)
+                        .withMilestone(milestone)
                         .build();
                 try
                 {

@@ -124,6 +124,34 @@ public class JiraEvent
             return (node != null && !node.isNull() && node.get("value").isTextual());
         }
 
+        public String getEpicIssueKey(ServiceConfig config)
+        {
+            String jiraEpicField = config.getJira().getEpicLinkField();
+            JsonNode node = customFields.get(jiraEpicField);
+            return node.textValue();
+        }
+        
+        public boolean hasEpicIssueKey(ServiceConfig config)
+        {
+            String jiraEpicField = config.getJira().getEpicLinkField();
+            JsonNode node = customFields.get(jiraEpicField);
+            return (node != null && !node.isNull() && node.isTextual());
+        }
+        
+        public String getEpicName(ServiceConfig config)
+        {
+            String epicNameField = config.getJira().getEpicNameField();
+            JsonNode node = customFields.get(epicNameField);
+            return node.textValue();
+        }
+        
+        public boolean hasEpicName(ServiceConfig config)
+        {
+            String epicNameField = config.getJira().getEpicNameField();
+            JsonNode node = customFields.get(epicNameField);
+            return (node != null && !node.isNull() && node.isTextual());
+        }
+        
         public String getJiraIssueKey()
         {
             return jiraIssueKey;

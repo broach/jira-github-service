@@ -43,6 +43,7 @@ import net.mostlyharmless.jghservice.connector.jira.PostComment;
 import net.mostlyharmless.jghservice.connector.jira.SearchIssues;
 import net.mostlyharmless.jghservice.connector.jira.UpdateIssue;
 import net.mostlyharmless.jghservice.resources.ServiceConfig;
+import net.mostlyharmless.jghservice.resources.github.GithubEvent.Milestone;
 import net.mostlyharmless.jghservice.resources.jira.JiraEvent;
 
 /**
@@ -138,6 +139,49 @@ public class GithubWebhook
                                 event.getIssue().getUser().getLogin() +
                                 " ]";
                 
+                /*
+                 * If we're mapping milestones to eipcs, have some 
+                 * work to do here. 
+                 */
+                String epicJiraKey = null;
+                if (repo.mapEpicsToMilestones() && event.getIssue().hasMilestone())
+                {
+                    Milestone ms = event.getIssue().getMilestone();
+                    String epicName = ms.getTitle();
+                    
+                    // Of course, they can't make this easy. Querying custom fields
+                    // requires a format of cf[xxxx] rather than, you know, the field
+                    // name.
+                    m = extractCustomFieldNumber.matcher(config.getJira().getEpicNameField());
+                    m.find();
+                    String cfNumber = m.group(1);
+                    String jql = "project = " + jiraProjectKey +
+                                " and cf[" + cfNumber +
+                                "] = \"" + epicName + "\""; 
+                    
+                    SearchIssues search = 
+                        new SearchIssues.Builder()
+                            .withJQL(jql)
+                            .build();
+                    try
+                    {
+                        List<JiraEvent.Issue> epicList = conn.execute(search);
+                        // Should only return one or zero.
+                        if (!epicList.isEmpty())
+                        {
+                            JiraEvent.Issue epic = epicList.get(0);
+                            epicJiraKey = epic.getJiraIssueKey();
+                        }
+                        
+                    }
+                    catch (ExecutionException ex)
+                    {
+                        Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    
+                    
+                }
+                
                 CreateIssue.Builder builder = 
                     new CreateIssue.Builder()
                         .withProjectKey(jiraProjectKey)
@@ -160,6 +204,11 @@ public class GithubWebhook
                     }
                 }
 
+                if (epicJiraKey != null)
+                {
+                    builder.withCustomField(config.getJira().getEpicLinkField(), epicJiraKey);
+                }
+                
                 try
                 {
                     String jiraKey = conn.execute(builder.build());
@@ -375,10 +424,6 @@ public class GithubWebhook
                 Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        
-        // Do the reverse for GH issue number mentions
-        
-        
     }
     
     private void processCreatedEvent(GithubEvent event)
