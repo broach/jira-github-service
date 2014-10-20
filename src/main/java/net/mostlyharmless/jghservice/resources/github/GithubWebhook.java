@@ -426,11 +426,19 @@ public class GithubWebhook
                         }
 
                     }
-
+                    else
+                    {
+                        // The issue isn't in JIRA. Check to see if we should
+                        // import it. This is for when the service is added to
+                        // an existing repo
+                        String repoName = event.getRepository().getName();
+                        if (config.getRepoForGithubName(repoName).importOnComment())
+                        {
+                            processOpenedEvent(event);
+                        }
+                    }
                 }
             }
-            
         }
     }
-    
 }

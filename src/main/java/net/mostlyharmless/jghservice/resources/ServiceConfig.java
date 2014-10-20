@@ -201,6 +201,8 @@ public class ServiceConfig
         private String jiraName;
         @XmlElement
         private String jiraProjectKey;
+        @XmlElement
+        private boolean importOnComment = false;
         @XmlElementWrapper(name="jiraFields")
         @XmlElement(name="field")
         private List<JiraField> jiraFields;
@@ -228,6 +230,11 @@ public class ServiceConfig
         public List<JiraField> getJiraFields()
         {
             return jiraFields;
+        }
+        
+        public boolean importOnComment()
+        {
+            return importOnComment;
         }
         
         
