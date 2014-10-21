@@ -32,6 +32,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import net.mostlyharmless.jghservice.connector.github.GetCommentsOnIssue;
 import net.mostlyharmless.jghservice.connector.github.GithubConnector;
 import net.mostlyharmless.jghservice.connector.github.ModifyComment;
 import net.mostlyharmless.jghservice.connector.github.UpdatePullRequest;
@@ -43,6 +44,9 @@ import net.mostlyharmless.jghservice.connector.jira.PostComment;
 import net.mostlyharmless.jghservice.connector.jira.SearchIssues;
 import net.mostlyharmless.jghservice.connector.jira.UpdateIssue;
 import net.mostlyharmless.jghservice.resources.ServiceConfig;
+import net.mostlyharmless.jghservice.resources.github.GithubEvent.Milestone;
+import net.mostlyharmless.jghservice.resources.ServiceConfig.Repository;
+import net.mostlyharmless.jghservice.resources.github.GithubEvent.Comment;
 import net.mostlyharmless.jghservice.resources.jira.JiraEvent;
 
 /**
@@ -57,13 +61,13 @@ public class GithubWebhook
     
     private static final Pattern jiraIssuePattern = 
         Pattern.compile("\\[JIRA: ([-A-Z0-9]+)\\]");
-    private final Pattern jiraCommentPattern =
+    private static final Pattern jiraCommentPattern =
         Pattern.compile("\\[posted via JIRA by .+\\]\\*\\*\\*$");
-    private final Pattern githubIssueMention =
+    private static final Pattern githubIssueMention =
         Pattern.compile("#(\\d+)");
-    private final Pattern jiraIssueMention =
+    private static final Pattern jiraIssueMention =
         Pattern.compile("(([A-Z]+)-\\d+)");
-    private final Pattern extractCustomFieldNumber =
+    private static final Pattern extractCustomFieldNumber =
         Pattern.compile("customfield_(\\d+)");
     
     private static final String GITHUB_ISSUE_OPENED = "opened";
@@ -89,10 +93,10 @@ public class GithubWebhook
         return Response.ok().build();
     }
     
-    private void processOpenedEvent(GithubEvent event)
+    private String processOpenedEvent(GithubEvent event)
     {
         JiraConnector conn = new JiraConnector(config);
-        
+        String jiraIssueKey = null;
         
         if (event.hasIssue())
         {
@@ -103,7 +107,7 @@ public class GithubWebhook
                 // Originated from JIRA, need to update JIRA with issue number and external link
 
                 String githubIssueField = config.getJira().getGithubIssueNumberField();
-                String jiraIssueKey = m.group(1);
+                jiraIssueKey = m.group(1);
 
                 UpdateIssue update = 
                     new UpdateIssue.Builder()
@@ -133,12 +137,60 @@ public class GithubWebhook
                 String jiraRepoName = repo.getJiraName();
                 int githubIssueNumber = event.getIssue().getNumber();
 
+                String body = event.getIssue().getBody() +
+                                "\n\n[Created in Github by " +
+                                event.getIssue().getUser().getLogin() +
+                                " ]";
+                
+                /*
+                 * If we're mapping milestones to eipcs, have some 
+                 * work to do here. 
+                 */
+                String epicJiraKey = null;
+                if (repo.mapEpicsToMilestones() && event.getIssue().hasMilestone())
+                {
+                    Milestone ms = event.getIssue().getMilestone();
+                    String epicName = ms.getTitle();
+                    
+                    // Of course, they can't make this easy. Querying custom fields
+                    // requires a format of cf[xxxx] rather than, you know, the field
+                    // name.
+                    m = extractCustomFieldNumber.matcher(config.getJira().getEpicNameField());
+                    m.find();
+                    String cfNumber = m.group(1);
+                    String jql = "project = " + jiraProjectKey +
+                                " and cf[" + cfNumber +
+                                "] = \"" + epicName + "\""; 
+                    
+                    SearchIssues search = 
+                        new SearchIssues.Builder()
+                            .withJQL(jql)
+                            .build();
+                    try
+                    {
+                        List<JiraEvent.Issue> epicList = conn.execute(search);
+                        // Should only return one or zero.
+                        if (!epicList.isEmpty())
+                        {
+                            JiraEvent.Issue epic = epicList.get(0);
+                            epicJiraKey = epic.getJiraIssueKey();
+                        }
+                        
+                    }
+                    catch (ExecutionException ex)
+                    {
+                        Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    
+                    
+                }
+                
                 CreateIssue.Builder builder = 
                     new CreateIssue.Builder()
                         .withProjectKey(jiraProjectKey)
                         .withIssuetype("Task")
                         .withSummary(event.getIssue().getTitle())
-                        .withDescription(event.getIssue().getBody())
+                        .withDescription(body)
                         .withCustomField(githubIssueField, githubIssueNumber)
                         .withCustomField(jiraRepoField, "value", jiraRepoName);
 
@@ -155,10 +207,15 @@ public class GithubWebhook
                     }
                 }
 
+                if (epicJiraKey != null)
+                {
+                    builder.withCustomField(config.getJira().getEpicLinkField(), epicJiraKey);
+                }
+                
                 try
                 {
-                    String jiraKey = conn.execute(builder.build());
-                    createExternalLink(conn, jiraKey, event);
+                    jiraIssueKey = conn.execute(builder.build());
+                    createExternalLink(conn, jiraIssueKey, event);
                 }
                 catch (ExecutionException ex)
                 {
@@ -170,6 +227,8 @@ public class GithubWebhook
         {
             linkPullRequestToIssue(conn, event);
         }
+        
+        return jiraIssueKey;
     }
     
     private void createExternalLink(JiraConnector conn, String jiraIssueKey, GithubEvent event) throws ExecutionException
@@ -370,10 +429,6 @@ public class GithubWebhook
                 Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        
-        // Do the reverse for GH issue number mentions
-        
-        
     }
     
     private void processCreatedEvent(GithubEvent event)
@@ -401,31 +456,68 @@ public class GithubWebhook
                     m = jiraIssuePattern.matcher(issueTitle);
                     if (m.find())
                     {
-                        body = body + " \n\n[posted via Github by " +
-                            event.getComment().getUser().getLogin() +
-                            "]";
-
-
-                        PostComment post = 
-                            new PostComment.Builder()
-                                .withIssueKey(m.group(1))
-                                .withComment(body)
-                                .build();
-                        try
-                        {
-                            conn.execute(post);
-                        }
-                        catch (ExecutionException ex)
-                        {
-                            Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-
+                        postCommentToJira(conn, m.group(1), 
+                                          event.getComment().getUser().getLogin(), 
+                                          body);
                     }
-
+                    else
+                    {
+                        // The issue isn't in JIRA. Check to see if we should
+                        // import it. This is for when the service is added to
+                        // a GH repo with existing issues.
+                        Repository repo = config.getRepoForGithubName(event.getRepository().getName());
+                        if (repo.importOnComment())
+                        {
+                            String jiraIssueKey = processOpenedEvent(event);
+                            
+                            // Now we have to import comments
+                            GithubConnector ghConn = new GithubConnector(config);
+                            
+                            GetCommentsOnIssue get =
+                                new GetCommentsOnIssue.Builder()
+                                    .withRepository(repo)
+                                    .withIssueNumber(event.getIssue().getNumber())
+                                    .build();
+                            try
+                            {
+                                List<GithubEvent.Comment> comments = ghConn.execute(get);
+                                for (Comment comment : comments)
+                                {
+                                    postCommentToJira(conn, jiraIssueKey, 
+                                                      comment.getUser().getLogin(), 
+                                                      comment.getBody());
+                                }
+                            }
+                            catch (ExecutionException ex)
+                            {
+                                Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                            
+                        }
+                    }
                 }
             }
-            
         }
     }
     
+    private void postCommentToJira(JiraConnector conn, String jiraIssueKey, String user, String body)
+    {
+        body = body + " \n\n[posted via Github by " +
+                            user +
+                            "]";
+
+        PostComment post = 
+            new PostComment.Builder()
+                .withIssueKey(jiraIssueKey)
+                .withComment(body)
+                .build();
+        try
+        {
+            conn.execute(post);
+        }
+        catch (ExecutionException ex)
+        {
+            Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
 }
