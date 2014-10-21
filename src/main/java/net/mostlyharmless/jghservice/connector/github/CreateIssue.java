@@ -40,6 +40,8 @@ public class CreateIssue implements GithubCommand<Integer>
     protected final String body;
     @JsonProperty
     protected final List<String> labels;
+    @JsonProperty
+    protected final Integer milestone;
     
     @JsonIgnore
     protected final ServiceConfig.Repository repo;
@@ -51,6 +53,7 @@ public class CreateIssue implements GithubCommand<Integer>
         this.body = init.body;
         this.repo = init.repo;
         this.labels = init.labels;
+        this.milestone = init.milestone;
     }
     
     @Override
@@ -93,6 +96,7 @@ public class CreateIssue implements GithubCommand<Integer>
         private String body;
         private final List<String> labels = new LinkedList<>();
         private ServiceConfig.Repository repo;
+        private Integer milestone;
         
         protected abstract T self();
         
@@ -123,6 +127,12 @@ public class CreateIssue implements GithubCommand<Integer>
         public T withLabels(List<String> labels)
         {
             this.labels.addAll(labels);
+            return self();
+        }
+        
+        public T withMilestone(Integer milestone)
+        {
+            this.milestone = milestone;
             return self();
         }
         

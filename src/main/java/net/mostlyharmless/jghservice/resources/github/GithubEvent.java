@@ -91,6 +91,8 @@ public class GithubEvent
         private PullRequest pullRequest;
         @JsonProperty
         private User user;
+        @JsonProperty
+        private Milestone milestone;
 
         public String getTitle()
         {
@@ -120,6 +122,41 @@ public class GithubEvent
         public User getUser()
         {
             return user;
+        }
+        
+        public boolean hasMilestone()
+        {
+            return milestone != null;
+        }
+        
+        public Milestone getMilestone()
+        {
+            return milestone;
+        }
+    }
+    
+    public static class Milestone
+    {
+        @JsonProperty
+        private int number;
+        @JsonProperty
+        private String state;
+        @JsonProperty
+        private String title;
+
+        public int getNumber()
+        {
+            return number;
+        }
+
+        public String getState()
+        {
+            return state;
+        }
+
+        public String getTitle()
+        {
+            return title;
         }
     }
     
