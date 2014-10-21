@@ -1,9 +1,12 @@
 jira-github-service
 ===================
 
-Web service that sits between Github and JIRA.
+Web service that sits between Github and JIRA web hooks in order to sync the two systems.
 
-See the `configExample` file for configuration. Note you must have the `context.xml` for the webapp pointed at a config.
+## Current status
+Overall this should work for anyone using JIRA agile and Github. See the `configExample` file for configuration. Note you must have the `context.xml` for the webapp pointed at a config.
+
+There's still a bit of cruft in the code that could be cleaned up, but it works.
 
 ## Current features
 ### Issues
