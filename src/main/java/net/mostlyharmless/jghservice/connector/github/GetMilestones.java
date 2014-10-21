@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
+import net.mostlyharmless.jghservice.resources.ObjectMapperProvider;
 import net.mostlyharmless.jghservice.resources.ServiceConfig.Repository;
+import net.mostlyharmless.jghservice.resources.github.GithubEvent;
 import net.mostlyharmless.jghservice.resources.github.GithubEvent.Milestone;
 
 /**
@@ -71,7 +73,8 @@ public class GetMilestones implements GithubCommand<List<Milestone>>
     public List<Milestone> processResponse(String jsonResponse) throws IOException
     {
         TypeReference<List<Milestone>> tr = new TypeReference<List<Milestone>>(){};
-        return new ObjectMapper().readValue(jsonResponse, tr);
+        ObjectMapper m = new ObjectMapperProvider().getContext(GithubEvent.Milestone.class);
+        return m.readValue(jsonResponse, tr);
     }
     
     public static class Builder

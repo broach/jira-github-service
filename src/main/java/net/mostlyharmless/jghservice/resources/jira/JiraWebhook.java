@@ -94,97 +94,126 @@ public class JiraWebhook
             if (!event.getIssue().hasGithubIssueNumber(config))
             {
                 // Originating in Jira if there's no GH #
-                // Create a new issue in GH
                 
-                String title = event.getIssue().getSummary() + 
-                                " [JIRA: " + event.getIssue().getJiraIssueKey() +
-                                "]";
-                
-                String body = event.getIssue().getDescription() +
-                                "\n\n**[Created in JIRA by " +
-                                event.getIssue().getReporter().getDisplayName() +
-                                "]**";
-                       
-                Integer milestone = null;
-                if (config.getJira().hasEpicLinkField() && repository.mapEpicsToMilestones())
+                if (event.getIssue().isEpic())
                 {
-                    /*
-                     * Mapping Epics to Milestones takes a few operations. The 
-                     * event from JIRA will have the JIRA key for the Epic issue. 
-                     * That issue will have to be retrieved, and the title 
-                     * looked up as a milestone in GH. If it doesn't exist, it 
-                     * has to be created in GH. 
-                     */
+                    // New epic. Create a Milestone.
                     
-                    if (event.getIssue().hasEpicIssueKey(config))
+                    // Epics have a Name, a Summary, and a Description. In
+                    // GH we just have the title and decription. 
+                    String description = event.getIssue().getSummary() +
+                                            "\n\n" + 
+                                            event.getIssue().getDescription();
+                    
+                    CreateMilestone create =
+                        new CreateMilestone.Builder()
+                            .withRepository(repository)
+                            .withTitle(event.getIssue().getEpicName(config))
+                            .withDescription(description)
+                            .build();
+                    try
                     {
-                        String jiraEpicKey = event.getIssue().getEpicIssueKey(config);
-                        
-                        JiraConnector jConn = new JiraConnector(config);
-                        
-                        GetIssue get = 
-                            new GetIssue.Builder()
-                                .withIssueKey(jiraEpicKey)
-                                .build();
-                        try
+                        conn.execute(create);
+                    }
+                    catch (ExecutionException ex)
+                    {
+                        Logger.getLogger(JiraWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+                else
+                {
+                    // Create a new issue in GH
+                    
+                    String title = event.getIssue().getSummary() + 
+                                    " [JIRA: " + event.getIssue().getJiraIssueKey() +
+                                    "]";
+
+                    String body = event.getIssue().getDescription() +
+                                    "\n\n**[Created in JIRA by " +
+                                    event.getIssue().getReporter().getDisplayName() +
+                                    "]**";
+
+                    Integer milestone = null;
+                    if (config.getJira().hasEpicLinkField() && repository.mapEpicsToMilestones())
+                    {
+                        /*
+                         * Mapping Epics to Milestones takes a few operations. The 
+                         * event from JIRA will have the JIRA key for the Epic issue. 
+                         * That issue will have to be retrieved, and the title 
+                         * looked up as a milestone in GH. If it doesn't exist, it 
+                         * has to be created in GH. 
+                         */
+
+                        if (event.getIssue().hasEpicIssueKey(config))
                         {
-                            JiraEvent.Issue epic = jConn.execute(get);
-                            String epicName = epic.getEpicName(config);
-                            
-                            GetMilestones getMs = 
-                                new GetMilestones.Builder()
-                                    .withRepositoy(repository)
+                            String jiraEpicKey = event.getIssue().getEpicIssueKey(config);
+
+                            JiraConnector jConn = new JiraConnector(config);
+
+                            GetIssue get = 
+                                new GetIssue.Builder()
+                                    .withIssueKey(jiraEpicKey)
                                     .build();
-                            
-                            List<Milestone> msList = conn.execute(getMs);
-                            
-                            
-                            for (Milestone ms : msList)
+                            try
                             {
-                                if (ms.getTitle().equals(epicName))
+                                JiraEvent.Issue epic = jConn.execute(get);
+                                String epicName = epic.getEpicName(config);
+
+                                GetMilestones getMs = 
+                                    new GetMilestones.Builder()
+                                        .withRepositoy(repository)
+                                        .build();
+
+                                List<Milestone> msList = conn.execute(getMs);
+
+
+                                for (Milestone ms : msList)
                                 {
-                                    milestone = ms.getNumber();
-                                    break;
+                                    if (ms.getTitle().equals(epicName))
+                                    {
+                                        milestone = ms.getNumber();
+                                        break;
+                                    }
+                                }
+
+                                if (milestone == null)
+                                {
+                                    // Need to create this milestone in GH
+                                    CreateMilestone create =
+                                        new CreateMilestone.Builder()
+                                            .withRepository(repository)
+                                            .withTitle(epicName)
+                                            .build();
+
+                                    milestone = conn.execute(create);
                                 }
                             }
-                            
-                            if (milestone == null)
+                            catch (ExecutionException ex)
                             {
-                                // Need to create this milestone in GH
-                                CreateMilestone create =
-                                    new CreateMilestone.Builder()
-                                        .withRepository(repository)
-                                        .withTitle(epicName)
-                                        .build();
-                                
-                                milestone = conn.execute(create);
+                                Logger.getLogger(JiraWebhook.class.getName()).log(Level.SEVERE, null, ex);
                             }
+
+
                         }
-                        catch (ExecutionException ex)
-                        {
-                            Logger.getLogger(JiraWebhook.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-                        
-                        
+
                     }
-                    
-                }
-                
-                CreateIssue create = 
-                    new CreateIssue.Builder()
-                        .withTitle(title)
-                        .withBody(body)
-                        .addLabel("JIRA: To Do")
-                        .withRepository(repository)
-                        .withMilestone(milestone)
-                        .build();
-                try
-                {
-                    conn.execute(create);
-                }
-                catch (ExecutionException ex)
-                {
-                    Logger.getLogger(JiraWebhook.class.getName()).log(Level.SEVERE, null, ex);
+
+                    CreateIssue create = 
+                        new CreateIssue.Builder()
+                            .withTitle(title)
+                            .withBody(body)
+                            .addLabel("JIRA: To Do")
+                            .withRepository(repository)
+                            .withMilestone(milestone)
+                            .build();
+                    try
+                    {
+                        conn.execute(create);
+                    }
+                    catch (ExecutionException ex)
+                    {
+                        Logger.getLogger(JiraWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                    }
                 }
             }
             else
@@ -350,17 +379,15 @@ public class JiraWebhook
         List<String> newList = new LinkedList<>();
         for (String label : labels)
         {
-            if (label.equals("JIRA: To Do") 
-                || label.equals("JIRA: In Progress")
-                || label.equals("JIRA: Needs Review")
-                || label.equals("JIRA: Closed")
-                || label.equals("JIRA: Reopened")
-                || label.equals("JIRA: Resolved"))
+            if (!label.equals("JIRA: To Do") 
+                && !label.equals("JIRA: In Progress")
+                && !label.equals("JIRA: Needs Review")
+                && !label.equals("JIRA: Closed")
+                && !label.equals("JIRA: Reopened")
+                && !label.equals("JIRA: Resolved"))
             {
-                continue;
+                newList.add(label);
             }
-            newList.add(label);
-            
         }
         return newList;
     }

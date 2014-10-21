@@ -96,18 +96,21 @@ public class JiraEvent
         private final String summary;
         private final String description;
         private final Reporter reporter;
+        private final String issueType;
         
         private final Map<String, JsonNode> customFields;
         
         public Issue(String key, String summary, String description, 
                                                  Map<String,JsonNode> customFields,
-                                                 Reporter reporter)
+                                                 Reporter reporter,
+                                                 String type)
         {
             this.jiraIssueKey = key;
             this.summary = summary;
             this.description = description;
             this.customFields = customFields;
             this.reporter = reporter;
+            this.issueType = type;
         }
         
         public String getGithubRepo(ServiceConfig config)
@@ -186,6 +189,11 @@ public class JiraEvent
             return reporter;
         }
         
+        public boolean isEpic()
+        {
+            return issueType.equals("Epic");
+        }
+        
         public static class Reporter
         {
             @JsonProperty
@@ -209,6 +217,8 @@ public class JiraEvent
                 String description = node.get("description").textValue();
                 Reporter r = jp.getCodec().treeToValue(node.get("reporter"), Reporter.class);
                 
+                String type = node.get("issuetype").get("name").textValue();
+                
                 // Store the custom fields in a map
                 Map<String, JsonNode> customFields = new HashMap<>();
                 Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
@@ -221,7 +231,7 @@ public class JiraEvent
                     }
                 }
                 
-                return new Issue(key, summary, description, customFields, r);
+                return new Issue(key, summary, description, customFields, r, type);
                 
             }
             
