@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Brian Roach <roach at basho dot com>.
+ * Copyright 2014 Brian Roach <roach at mostlyharmless dot net>.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import net.mostlyharmless.jghservice.resources.ServiceConfig.Repository;
 
 /**
  *
- * @author Brian Roach <roach at basho dot com>
+ * @author Brian Roach <roach at mostlyharmless dot net>
  */
 public class CreateMilestone implements GithubCommand<Integer>
 {
