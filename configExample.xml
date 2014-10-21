@@ -7,6 +7,10 @@
         <githubIssueNumberField>customfield_10025</githubIssueNumberField>
         <!-- Custom field in Jira that is a pull-down / single select -->
         <githubRepoNameField>customfield_10600</githubRepoNameField>
+        <!-- Custom field in Jira that is the Epic Link (regualr issues) -->
+        <epicLinkField>customfield_10007</epicLinkField>
+        <!-- Custom field in Jira that is the Epic Name (epics) -->
+	<epicNameField>customfield_10008</epicNameField>
     </jira>
     <github>
         <username></username>
@@ -19,6 +23,10 @@
             <githubOwner>basho</githubOwner>
             <!-- Name in your githubRepoNameField -->
             <jiraName>Java Client</jiraName>
+            <!-- Enables importing existing issues to JIRA on next comment -->
+            <importOnComment>true</importOnComment>
+            <!-- Enables the Epic mapping feature -->
+	    <mapEpicsToMilestones>true</mapEpicsToMilestones>
             <!-- Additional fields in JIRA you want populated when an issue
                  is created in Github -->
             <jiraFields>
