@@ -69,6 +69,10 @@ public class GithubWebhook
         Pattern.compile("(([A-Z]+)-\\d+)");
     private static final Pattern extractCustomFieldNumber =
         Pattern.compile("customfield_(\\d+)");
+    private static final Pattern extractFixedVersion =
+        Pattern.compile("^Fixed in: (.+)$");
+    private static final Pattern extractAffectsVersion =
+        Pattern.compile("^Affects: (.*)$");
     
     private static final String GITHUB_ISSUE_OPENED = "opened";
     private static final String GITHUB_COMMENT_CREATED = "created";
@@ -210,6 +214,30 @@ public class GithubWebhook
                 if (epicJiraKey != null)
                 {
                     builder.withCustomField(config.getJira().getEpicLinkField(), epicJiraKey);
+                }
+                
+                if (repo.labelVersions())
+                {
+                    List<String> fixVersions = new LinkedList<>();
+                    List<String> affectsVersions = new LinkedList<>();
+                    for (GithubEvent.Issue.Label label : event.getIssue().getLabels())
+                    {
+                        m = extractFixedVersion.matcher(label.getName());
+                        if (m.find())
+                        {
+                            fixVersions.add(m.group(1));
+                        }
+                        else
+                        {
+                            m = extractAffectsVersion.matcher(label.getName());
+                            if (m.find())
+                            {
+                                affectsVersions.add(m.group(1));
+                            }
+                        }
+                    }
+                    builder.withAffectsVersions(affectsVersions)
+                            .withFixVersions(fixVersions);
                 }
                 
                 try

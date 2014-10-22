@@ -17,6 +17,8 @@
 package net.mostlyharmless.jghservice.resources.github;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Collections;
+import java.util.List;
 
 /**
  *
@@ -93,6 +95,8 @@ public class GithubEvent
         private User user;
         @JsonProperty
         private Milestone milestone;
+        @JsonProperty
+        private List<Label> labels;
 
         public String getTitle()
         {
@@ -133,7 +137,25 @@ public class GithubEvent
         {
             return milestone;
         }
+        
+        public List<Label> getLabels()
+        {
+            return Collections.unmodifiableList(labels);
+        }
+        
+        public static class Label
+        {
+            @JsonProperty
+            private String name;
+
+            public String getName()
+            {
+                return name;
+            }
+        }
     }
+    
+    
     
     public static class Milestone
     {
