@@ -230,6 +230,8 @@ public class ServiceConfig
         private List<JiraField> jiraFields;
         @XmlElement
         private boolean mapEpicsToMilestones = false;
+        @XmlElement
+        private boolean labelVersions = false;
 
         public String getGithubName()
         {
@@ -264,6 +266,11 @@ public class ServiceConfig
         public boolean importOnComment()
         {
             return importOnComment;
+        }
+        
+        public boolean labelVersions()
+        {
+            return labelVersions;
         }
         
         public static class JiraField
