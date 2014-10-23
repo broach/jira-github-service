@@ -22,9 +22,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import net.mostlyharmless.jghservice.resources.ServiceConfig;
@@ -97,13 +100,18 @@ public class JiraEvent
         private final String description;
         private final Reporter reporter;
         private final String issueType;
-        
+        private final List<String> fixVersionsList;
+        private final List<String> affectsVersionsList;
+        private final String assignee;
         private final Map<String, JsonNode> customFields;
         
         public Issue(String key, String summary, String description, 
                                                  Map<String,JsonNode> customFields,
                                                  Reporter reporter,
-                                                 String type)
+                                                 String type,
+                                                 List<String> fixVersionsList,
+                                                 List<String> affectsVersionsList,
+                                                 String assigneeName)
         {
             this.jiraIssueKey = key;
             this.summary = summary;
@@ -111,6 +119,9 @@ public class JiraEvent
             this.customFields = customFields;
             this.reporter = reporter;
             this.issueType = type;
+            this.fixVersionsList = fixVersionsList;
+            this.affectsVersionsList = affectsVersionsList;
+            this.assignee = assigneeName;
         }
         
         public String getGithubRepo(ServiceConfig config)
@@ -170,11 +181,18 @@ public class JiraEvent
             return description;
         }
 
-        public int getGithubIssueNumber(ServiceConfig config)
+        public Integer getGithubIssueNumber(ServiceConfig config)
         {
             String ghIssueNumField = config.getJira().getGithubIssueNumberField();
             JsonNode node = customFields.get(ghIssueNumField);
-            return node.asInt();
+            if (node.isNull())
+            {
+                return null;
+            }
+            else
+            {
+                return node.asInt();
+            }
         }
 
         public boolean hasGithubIssueNumber(ServiceConfig config)
@@ -192,6 +210,26 @@ public class JiraEvent
         public boolean isEpic()
         {
             return issueType.equals("Epic");
+        }
+        
+        public List<String> getFixVersions()
+        {
+            return Collections.unmodifiableList(fixVersionsList);
+        }
+        
+        public List<String> getAffectsVersions()
+        {
+            return Collections.unmodifiableList(affectsVersionsList);
+        }
+        
+        public boolean hasAsignee()
+        {
+            return assignee != null;
+        }
+        
+        public String getAssignee()
+        {
+            return assignee;
         }
         
         public static class Reporter
@@ -219,6 +257,27 @@ public class JiraEvent
                 
                 String type = node.get("issuetype").get("name").textValue();
                 
+                List<String> fixVersionList = new LinkedList<>();
+                ArrayNode fixVersions = (ArrayNode) node.get("fixVersions");
+                for (JsonNode version : fixVersions)
+                {
+                    fixVersionList.add(version.get("name").textValue());
+                }
+                
+                List<String> affectsVersionList = new LinkedList<>();
+                ArrayNode affectsVersions = (ArrayNode) node.get("versions");
+                for (JsonNode version : affectsVersions)
+                {
+                    affectsVersionList.add(version.get("name").textValue());
+                }
+                
+                JsonNode assignee = node.get("assignee");
+                String assigneeName = null;
+                if (!assignee.isNull())
+                {
+                    assigneeName = assignee.get("name").textValue();
+                }
+                
                 // Store the custom fields in a map
                 Map<String, JsonNode> customFields = new HashMap<>();
                 Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
@@ -231,7 +290,9 @@ public class JiraEvent
                     }
                 }
                 
-                return new Issue(key, summary, description, customFields, r, type);
+                return new Issue(key, summary, description, customFields, r, 
+                                    type, fixVersionList, affectsVersionList,
+                                    assigneeName);
                 
             }
             

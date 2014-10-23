@@ -42,6 +42,8 @@ public class CreateIssue implements GithubCommand<Integer>
     protected final List<String> labels;
     @JsonProperty
     protected final Integer milestone;
+    @JsonProperty
+    protected final String assignee;
     
     @JsonIgnore
     protected final ServiceConfig.Repository repo;
@@ -54,6 +56,7 @@ public class CreateIssue implements GithubCommand<Integer>
         this.repo = init.repo;
         this.labels = init.labels;
         this.milestone = init.milestone;
+        this.assignee = init.assignee;
     }
     
     @Override
@@ -94,9 +97,10 @@ public class CreateIssue implements GithubCommand<Integer>
     {
         private String title;
         private String body;
-        private final List<String> labels = new LinkedList<>();
+        private List<String> labels;
         private ServiceConfig.Repository repo;
         private Integer milestone;
+        private String assignee;
         
         protected abstract T self();
         
@@ -120,12 +124,20 @@ public class CreateIssue implements GithubCommand<Integer>
         
         public T addLabel(String label)
         {
+            if (this.labels == null)
+            {
+                this.labels = new LinkedList<>();
+            }
             labels.add(label);
             return self();
         }
         
         public T withLabels(List<String> labels)
         {
+            if (this.labels == null)
+            {
+                this.labels = new LinkedList<>();
+            }
             this.labels.addAll(labels);
             return self();
         }
@@ -133,6 +145,12 @@ public class CreateIssue implements GithubCommand<Integer>
         public T withMilestone(Integer milestone)
         {
             this.milestone = milestone;
+            return self();
+        }
+        
+        public T withAssignee(String assignee)
+        {
+            this.assignee = assignee;
             return self();
         }
         

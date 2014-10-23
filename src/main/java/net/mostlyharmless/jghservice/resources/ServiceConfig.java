@@ -48,7 +48,10 @@ public class ServiceConfig
     private Github github;
     @XmlElement(name="repositories")
     @XmlJavaTypeAdapter(RepositoryAdapter.class)
-    private Map<String, Map<String,Repository>> repositories;
+    private Map<String, Map<String, Repository>> repositories;
+    @XmlElement(name="userMappings")
+    @XmlJavaTypeAdapter(UserMappingAdapter.class)
+    private Map<String, Map<String, String>> userMappings;
     
     private List<String> jiraProjectNames;
     
@@ -80,6 +83,35 @@ public class ServiceConfig
             list.add(entry.getValue());
         }
         return list;
+    }
+    
+    public boolean hasUserMappings()
+    {
+        return userMappings != null;
+    }
+    
+    public String getGithubUser(String jiraUser)
+    {
+        if (!hasUserMappings())
+        {
+            return null;
+        }
+        else
+        {
+            return userMappings.get("jira").get(jiraUser);
+        }
+    }
+    
+    public String getJiraUser(String githubUser)
+    {
+        if (!hasUserMappings())
+        {
+            return null;
+        }
+        else
+        {
+            return userMappings.get("github").get(githubUser);
+        }
     }
     
     public synchronized List<String> getProjectKeys()
@@ -196,6 +228,69 @@ public class ServiceConfig
         
     }
     
+    public static class UserMappings
+    {
+        @XmlElement(name="userMap")
+        private List<UserMap> entries = new ArrayList<>();
+        
+        List<UserMap> entries()
+        {
+            return Collections.unmodifiableList(entries);
+        }
+        
+        void addEntry(UserMap entry)
+        {
+            entries.add(entry);
+        }
+        
+    }
+    
+    public static class UserMap
+    {
+        @XmlElement
+        private String github;
+        @XmlElement
+        private String jira;
+        
+        public String getGithubName()
+        {
+            return github;
+        }
+        
+        public String getJiraName()
+        {
+            return jira;
+        }
+    }
+    
+    public static class UserMappingAdapter extends XmlAdapter<UserMappings, Map<String, Map<String, String>>>
+    {
+
+        @Override
+        public Map<String, Map<String, String>> unmarshal(UserMappings mappings) throws Exception
+        {
+            Map<String, Map<String, String>> newMap = new HashMap<>();
+            Map<String, String> ghToJira = new HashMap<>();
+            Map<String, String> jiraToGh = new HashMap<>();
+            newMap.put("jira", jiraToGh);
+            newMap.put("github", ghToJira);
+            
+            for (UserMap map : mappings.entries())
+            {
+                jiraToGh.put(map.getJiraName(), map.getGithubName());
+                ghToJira.put(map.getGithubName(), map.getJiraName());
+            }
+            return newMap;
+        }
+
+        @Override
+        public UserMappings marshal(Map<String, Map<String, String>> v) throws Exception
+        {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+        
+    }
+    
     public static class Repositories
     {
         @XmlElement(name="repository")
@@ -230,6 +325,8 @@ public class ServiceConfig
         private List<JiraField> jiraFields;
         @XmlElement
         private boolean mapEpicsToMilestones = false;
+        @XmlElement
+        private boolean labelVersions = false;
 
         public String getGithubName()
         {
@@ -264,6 +361,11 @@ public class ServiceConfig
         public boolean importOnComment()
         {
             return importOnComment;
+        }
+        
+        public boolean labelVersions()
+        {
+            return labelVersions;
         }
         
         public static class JiraField

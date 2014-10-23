@@ -30,6 +30,8 @@ public class ModifyIssue extends CreateIssue
 {
     @JsonIgnore
     private final String issueNumber;
+    @JsonIgnore
+    public static final String NO_ASSIGNEE = "";
     @JsonProperty
     private final String state;
     

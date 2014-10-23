@@ -19,6 +19,7 @@ package net.mostlyharmless.jghservice.connector.jira;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.NumericNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -27,6 +28,8 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -41,6 +44,11 @@ public class CreateIssue implements JiraCommand<String>
     protected final String summary;
     protected final String description;
     protected final Map<String, JsonNode> customFields = new HashMap<>();
+    protected final List<String> fixVersions = new LinkedList<>();
+    protected final List<String> affectsVersions= new LinkedList<>();
+    protected final String assignee;
+    
+    public final static String NO_ASSIGNEE = "";
     
     protected CreateIssue(Init<?> builder)
     {
@@ -49,6 +57,9 @@ public class CreateIssue implements JiraCommand<String>
         this.summary = builder.summary;
         this.description = builder.description;
         this.customFields.putAll(builder.customFields);
+        this.affectsVersions.addAll(builder.affectsVersions);
+        this.fixVersions.addAll(builder.fixVersions);
+        this.assignee = builder.assignee;
     }
     
     @Override
@@ -89,6 +100,44 @@ public class CreateIssue implements JiraCommand<String>
             fields.put("description", description);
         }
         
+        if (!fixVersions.isEmpty())
+        {
+            ArrayNode array = factory.arrayNode();
+            for (String version : fixVersions)
+            {
+                ObjectNode node = factory.objectNode();
+                node.put("name", version);
+                array.add(node);
+            }
+            fields.put("fixVersions", array);
+        }
+        
+        if (!affectsVersions.isEmpty())
+        {
+            ArrayNode array = factory.arrayNode();
+            for (String version : affectsVersions)
+            {
+                ObjectNode node = factory.objectNode();
+                node.put("name", version);
+                array.add(node);
+            }
+            fields.put("versions", array);
+        }
+        
+        if (assignee != null)
+        {
+            ObjectNode node = factory.objectNode();
+            if (assignee.isEmpty())
+            {
+                node.put("name", factory.nullNode());
+            }
+            else
+            {
+                node.put("name", assignee);
+            }
+            fields.put("assignee", node);
+        }
+        
         for (Map.Entry<String, JsonNode> entry : customFields.entrySet())
         {
             fields.put(entry.getKey(), entry.getValue());
@@ -126,6 +175,9 @@ public class CreateIssue implements JiraCommand<String>
         private final Map<String, JsonNode> customFields = new HashMap<>();
         private String summary;
         private String description;
+        private List<String> affectsVersions = new LinkedList<>();
+        private List<String> fixVersions = new LinkedList<>();
+        private String assignee;
         
         public T withProjectKey(String projectKey)
         {
@@ -190,6 +242,26 @@ public class CreateIssue implements JiraCommand<String>
             ((ObjectNode)fieldNode).put(key, value);
             return self();
         }
+        
+        public T withFixVersions(List<String> fixVersions)
+        {
+            this.fixVersions.clear();
+            this.fixVersions.addAll(fixVersions);
+            return self();
+        }
+        
+        public T withAffectsVersions(List<String> affectsVersions)
+        {
+            this.affectsVersions.clear();
+            this.affectsVersions.addAll(affectsVersions);
+            return self();
+        }
+        public T withAssignee(String assignee)
+        {
+            this.assignee = assignee;
+            return self();
+        }
+        
         
         protected void validate()
         {

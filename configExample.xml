@@ -39,4 +39,10 @@
             <jiraProjectKey>CLIENTS</jiraProjectKey>
         </repository>
     </repositories>
+    <userMappings>
+	<userMap>
+	    <github>broach</github>
+	    <jira>roach</jira>
+	</userMap>
+    </userMappings>
 </config>

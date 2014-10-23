@@ -43,6 +43,7 @@ import net.mostlyharmless.jghservice.connector.jira.JiraConnector;
 import net.mostlyharmless.jghservice.connector.jira.PostComment;
 import net.mostlyharmless.jghservice.connector.jira.SearchIssues;
 import net.mostlyharmless.jghservice.connector.jira.UpdateIssue;
+import net.mostlyharmless.jghservice.connector.jira.UpdateVersionsOnIssue;
 import net.mostlyharmless.jghservice.resources.ServiceConfig;
 import net.mostlyharmless.jghservice.resources.github.GithubEvent.Milestone;
 import net.mostlyharmless.jghservice.resources.ServiceConfig.Repository;
@@ -69,9 +70,17 @@ public class GithubWebhook
         Pattern.compile("(([A-Z]+)-\\d+)");
     private static final Pattern extractCustomFieldNumber =
         Pattern.compile("customfield_(\\d+)");
+    private static final Pattern extractFixedVersion =
+        Pattern.compile("^Fixed in: (.+)$");
+    private static final Pattern extractAffectsVersion =
+        Pattern.compile("^Affects: (.*)$");
     
     private static final String GITHUB_ISSUE_OPENED = "opened";
     private static final String GITHUB_COMMENT_CREATED = "created";
+    private static final String GITHUB_ASSIGNED = "assigned";
+    private static final String GITHUB_UNASSIGNED = "unassigned";
+    private static final String GITHUB_LABELED = "labeled";
+    private static final String GITHUB_UNLABELED = "unlabeled";
     
     @POST
     @Consumes({MediaType.APPLICATION_JSON})
@@ -85,6 +94,14 @@ public class GithubWebhook
                 break;
             case GITHUB_COMMENT_CREATED:
                 processCreatedEvent(event);
+                break;
+            case GITHUB_ASSIGNED:
+            case GITHUB_UNASSIGNED:
+                processAssigned(event);
+                break;
+            case GITHUB_LABELED:
+            case GITHUB_UNLABELED:
+                processLabeled(event);
                 break;
             default:
                 break;
@@ -210,6 +227,38 @@ public class GithubWebhook
                 if (epicJiraKey != null)
                 {
                     builder.withCustomField(config.getJira().getEpicLinkField(), epicJiraKey);
+                }
+                
+                if (repo.labelVersions())
+                {
+                    List<String> fixVersions = new LinkedList<>();
+                    List<String> affectsVersions = new LinkedList<>();
+                    for (GithubEvent.Issue.Label label : event.getIssue().getLabels())
+                    {
+                        m = extractFixedVersion.matcher(label.getName());
+                        if (m.find())
+                        {
+                            fixVersions.add(m.group(1));
+                        }
+                        else
+                        {
+                            m = extractAffectsVersion.matcher(label.getName());
+                            if (m.find())
+                            {
+                                affectsVersions.add(m.group(1));
+                            }
+                        }
+                    }
+                    builder.withAffectsVersions(affectsVersions)
+                            .withFixVersions(fixVersions);
+                }
+                
+                if (config.hasUserMappings() && event.getIssue().hasAssignee())
+                {
+                    String jiraAssignee = 
+                        config.getJiraUser(event.getIssue().getAssignee().getLogin());
+                    
+                    builder.withAssignee(jiraAssignee);
                 }
                 
                 try
@@ -518,6 +567,169 @@ public class GithubWebhook
         catch (ExecutionException ex)
         {
             Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    private void processAssigned(GithubEvent event)
+    {
+        if (config.hasUserMappings())
+        {
+            GithubEvent.User ghUser = event.getAssignee();
+            String jiraUser = config.getJiraUser(ghUser.getLogin());
+            
+            if (jiraUser != null)
+            {
+                // Get the current issue from JIRA
+                String title = event.getIssue().getTitle();
+                Matcher m = jiraIssuePattern.matcher(title); 
+                if (m.find())
+                {
+                    JiraConnector conn = new JiraConnector(config);
+                    GetIssue get = 
+                        new GetIssue.Builder()
+                            .withIssueKey(m.group(1))
+                            .build();
+                    try
+                    {
+                        JiraEvent.Issue issue = conn.execute(get);
+                        String jiraCurrentAssignee = issue.getAssignee();
+                        
+                        if (event.getAction().equals(GITHUB_UNASSIGNED))
+                        {
+                            if (jiraCurrentAssignee != null && 
+                                jiraCurrentAssignee.equals(jiraUser))
+                            {
+                                // Update Jira issue with no one assigned
+                                UpdateIssue update = 
+                                    new UpdateIssue.Builder()
+                                        .withJiraIssueKey(m.group(1))
+                                        .withAssignee(UpdateIssue.NO_ASSIGNEE)
+                                        .build();
+                                
+                                conn.execute(update);
+                            }
+                        }
+                        else
+                        {
+                            if (jiraCurrentAssignee == null ||
+                                !jiraCurrentAssignee.equals(jiraUser))
+                            {
+                                UpdateIssue update = 
+                                    new UpdateIssue.Builder()
+                                        .withJiraIssueKey(m.group(1))
+                                        .withAssignee(jiraUser)
+                                        .build();
+                                
+                                conn.execute(update);
+                            }
+                        }
+                    }
+                    catch (ExecutionException ex)
+                    {
+                        Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            }
+        }
+    }
+    
+    private void processLabeled(GithubEvent event)
+    {
+        // Should always be true but ... meh.
+        if (event.hasLabel() && event.hasIssue())
+        {
+            // We're only looking for Version labels here.
+            GithubEvent.Issue.Label label = event.getLabel();
+            
+            if (label.getName().startsWith("Fixed in:") ||
+                label.getName().startsWith("Affects:"))
+            {
+                String title = event.getIssue().getTitle();
+                Matcher m = jiraIssuePattern.matcher(title);
+                if (m.find())
+                {
+                    String jiraIssueKey = m.group(1);
+
+                    // Git the Jira issue and check the versions
+                    JiraConnector conn = new JiraConnector(config);
+                    
+                    GetIssue get = 
+                        new GetIssue.Builder()
+                            .withIssueKey(jiraIssueKey)
+                            .build();
+                    try
+                    {
+                        JiraEvent.Issue jiraIssue = conn.execute(get);
+                        
+                        m = extractFixedVersion.matcher(label.getName());
+                        if (m.find())
+                        {
+                            String version = m.group(1);
+                            if (event.getAction().equals(GITHUB_LABELED) &&
+                                !jiraIssue.getFixVersions().contains(version))
+                            {
+                                UpdateVersionsOnIssue update =
+                                    new UpdateVersionsOnIssue.Builder()
+                                        .withIssueKey(jiraIssueKey)
+                                        .addFixVersion(version)
+                                        .build();
+                                
+                                conn.execute(update);
+                            }
+                            else if (event.getAction().equals(GITHUB_UNLABELED) &&
+                                     jiraIssue.getFixVersions().contains(version))
+                            {
+                                UpdateVersionsOnIssue update =
+                                    new UpdateVersionsOnIssue.Builder()
+                                        .withIssueKey(jiraIssueKey)
+                                        .removeFixVersion(version)
+                                        .build();
+                                
+                                conn.execute(update);
+                            }
+
+                        }
+                        else
+                        {
+                            m = extractAffectsVersion.matcher(label.getName());
+                            if (m.find())
+                            {
+                                String version = m.group(1);
+                                if (event.getAction().equals(GITHUB_LABELED) &&
+                                    !jiraIssue.getAffectsVersions().contains(version))
+                                {
+                                    UpdateVersionsOnIssue update =
+                                        new UpdateVersionsOnIssue.Builder()
+                                            .withIssueKey(jiraIssueKey)
+                                            .addAffectsVersion(version)
+                                            .build();
+                                    
+                                    conn.execute(update);
+                                }
+                                else if (event.getAction().equals(GITHUB_UNLABELED) &&
+                                            jiraIssue.getAffectsVersions().contains(version))
+                                {
+                                    UpdateVersionsOnIssue update =
+                                        new UpdateVersionsOnIssue.Builder()
+                                            .withIssueKey(jiraIssueKey)
+                                            .removeAffectsVersion(version)
+                                            .build();
+                                    
+                                    conn.execute(update);
+                                }
+                            }
+                        }
+                        
+                    }
+                    catch (ExecutionException ex)
+                    {
+                        Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+
+                }
+            }
+            
+            
         }
     }
 }

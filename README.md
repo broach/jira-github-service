@@ -1,9 +1,12 @@
 jira-github-service
 ===================
 
-Web service that sits between Github and JIRA.
+Web service that sits between Github and JIRA web hooks in order to sync the two systems.
 
-See the `configExample` file for configuration. Note you must have the `context.xml` for the webapp pointed at a config.
+## Current status
+Overall this should work for anyone using JIRA agile and Github. See the `configExample` file for configuration. Note you must have the `context.xml` for the webapp pointed at a config.
+
+There's still a bit of cruft in the code that could be cleaned up, but it works.
 
 ## Current features
 ### Issues
@@ -22,8 +25,20 @@ See the `configExample` file for configuration. Note you must have the `context.
 * JIRA's PROJECT-xxx mention will automatically cause Github's #xxx to be added to body and show up on linked issue.
 * If you forget to add it to the body, a comment on the PR will now also trigger linking. 
 
-### Epics & Milestones
+### Epics & Milestones (optional)
 * Epics created in JIRA are created in Github as Milestones
 * Issues created in JIRA with an Epic link are put under the Milestone in Github
 * Issues created in Github with (JIRA) Milestone are mapped to the Epic in JIRA. 
 * Note that neither JIRA or Github send out a notification when an Epic or Milestone is assigned to an existing issue.
+
+### Versions (optional)
+* Affected Version/s and Fix Version/s created with issue in JIRA are labeled in Github.
+* Affected Version/s and Fix Version/s labeled when creating issue in Github are set in JIRA.
+* Add/Remove version in JIRA -> Github
+* Add/Remove version in Github -> JIRA
+ 
+### Assigned user mapping (optional)
+* Mapped JIRA <-> Github usernames in config allow for users assigned to issues to be synced.
+* Assign / Unassign user in JIRA -> Github
+* Assign / Unassign user in Github -> JIRA
+* Note that assigning an unmapped user in either system results in the opposite system to show unassigned.

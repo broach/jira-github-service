@@ -42,6 +42,7 @@ import net.mostlyharmless.jghservice.connector.github.SetLabelsOnIssue;
 import net.mostlyharmless.jghservice.connector.jira.GetIssue;
 import net.mostlyharmless.jghservice.connector.jira.JiraConnector;
 import net.mostlyharmless.jghservice.resources.ServiceConfig;
+import net.mostlyharmless.jghservice.resources.github.GithubEvent;
 
 /**
  *
@@ -197,14 +198,37 @@ public class JiraWebhook
                         }
 
                     }
+                    
+                    List<String> labels = new LinkedList<>();
+                    labels.add("JIRA: To Do");
+                    
+                    if (repository.labelVersions())
+                    {
+                        for (String version : event.getIssue().getFixVersions())
+                        {
+                            labels.add("Fixed in: " + version);
+                        }
+                        
+                        for (String version : event.getIssue().getAffectsVersions())
+                        {
+                            labels.add("Affects: " + version);
+                        }
+                    }
 
+                    String assignee = null;
+                    if (config.hasUserMappings() && event.getIssue().hasAsignee())
+                    {
+                        assignee = config.getGithubUser(event.getIssue().getAssignee());
+                    }
+                    
                     CreateIssue create = 
                         new CreateIssue.Builder()
                             .withTitle(title)
                             .withBody(body)
-                            .addLabel("JIRA: To Do")
+                            .withLabels(labels)
                             .withRepository(repository)
                             .withMilestone(milestone)
+                            .withAssignee(assignee)
                             .build();
                     try
                     {
@@ -223,16 +247,26 @@ public class JiraWebhook
                 
                 String title = event.getIssue().getSummary() +
                         " [JIRA: " + event.getIssue().getJiraIssueKey() + "]";
-                
-                ModifyIssue modify =
-                    new ModifyIssue.Builder()
-                        .withTitle(title)
-                        .withIssueNumber(event.getIssue().getGithubIssueNumber(config))
-                        .addLabel("JIRA: To Do")
-                        .withRepository(repository)
-                        .build();
                 try
                 {
+                    GetLabelsOnIssue get = 
+                        new GetLabelsOnIssue.Builder()
+                            .withRepo(repository)
+                            .withIssueNumber(event.getIssue().getGithubIssueNumber(config))
+                            .build();
+                    
+                    List<String> labels = conn.execute(get);
+                    labels = removeJiraStatusLabels(labels);
+                    labels.add("JIRA: To Do");
+                    
+                    ModifyIssue modify =
+                        new ModifyIssue.Builder()
+                            .withTitle(title)
+                            .withIssueNumber(event.getIssue().getGithubIssueNumber(config))
+                            .withLabels(labels)
+                            .withRepository(repository)
+                            .build();
+                
                     conn.execute(modify);
                 }
                 catch (ExecutionException ex)
@@ -250,8 +284,11 @@ public class JiraWebhook
         ServiceConfig.Repository repository = 
             config.getRepoForJiraName(ghRepo);
         
-        if (repository != null)
+        
+        if (repository != null && event.getIssue().hasGithubIssueNumber(config))
         {
+            int ghIssueNumber = 
+                            event.getIssue().getGithubIssueNumber(config);
             GithubConnector conn = new GithubConnector(config);
             if (event.hasComment())
             {
@@ -285,25 +322,18 @@ public class JiraWebhook
             if (event.hasChangelog())
             {
                 List<JiraEvent.ChangeLog.Item> items = event.getChangelog().getItems();
+                
                 for (JiraEvent.ChangeLog.Item item : items)
                 {
                     if (item.getField().equals("status"))
                     {
                         // Status change in JIRA, update GH issue
-                        int ghIssueNumber = 
-                            event.getIssue().getGithubIssueNumber(config);
-                        
-                        GetLabelsOnIssue getLabels =
-                            new GetLabelsOnIssue.Builder()
-                                .withIssueNumber(ghIssueNumber)
-                                .withRepo(repository)
-                                .build();
                         
                         List<String> existingLabels;
                         
                         try
                         {
-                            existingLabels = conn.execute(getLabels);
+                            existingLabels = getExistingLabels(conn, repository, ghIssueNumber);
                         }
                         catch (ExecutionException ex)
                         {
@@ -369,6 +399,140 @@ public class JiraWebhook
                             
                         }
                     }
+                    else if (item.getField().equals("Fix Version") && repository.labelVersions())
+                    {
+                        // Fix version added/removed
+                        List<String> existingLabels;
+                        
+                        try
+                        {
+                            existingLabels = getExistingLabels(conn, repository, ghIssueNumber);
+                            int numLabels = existingLabels.size();
+                            
+                            if (item.getToString() != null)
+                            {
+                                String newLabel = "Fixed in: " + item.getToString();
+                                if (!existingLabels.contains(newLabel))
+                                {
+                                    existingLabels.add("Fixed in: " + item.getToString());
+                                }
+                            }
+                            else if (item.getFromString() != null)
+                            {
+                                existingLabels.remove("Fixed in: " + item.getFromString());
+                            }
+                            
+                            if (numLabels != existingLabels.size())
+                            {
+                                SetLabelsOnIssue set = 
+                                    new SetLabelsOnIssue.Builder()
+                                        .withIssueNumber(ghIssueNumber)
+                                        .withRepo(repository)
+                                        .withLabels(existingLabels)
+                                        .build();
+
+                                conn.execute(set);
+                            }
+                        }
+                        catch (ExecutionException ex)
+                        {
+                            Logger.getLogger(JiraWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                    else if (item.getField().equals("Version") && repository.labelVersions())
+                    {
+                        // Affects version added/removed
+                        List<String> existingLabels;
+                        
+                        try
+                        {
+                            existingLabels = getExistingLabels(conn, repository, ghIssueNumber);
+                            int numLabels = existingLabels.size();
+                            
+                            if (item.getToString() != null)
+                            {
+                                String newLabel = "Affects: " + item.getToString();
+                                if (existingLabels.contains(newLabel))
+                                {
+                                    existingLabels.add("Affects: " + item.getToString());
+                                }
+                            }
+                            else if (item.getFromString() != null)
+                            {
+                                existingLabels.remove("Affects: " + item.getFromString());
+                            }
+                            
+                            if (numLabels != existingLabels.size())
+                            {
+                                SetLabelsOnIssue set = 
+                                    new SetLabelsOnIssue.Builder()
+                                        .withIssueNumber(ghIssueNumber)
+                                        .withRepo(repository)
+                                        .withLabels(existingLabels)
+                                        .build();
+
+                                conn.execute(set);
+                            }
+                        }
+                        catch (ExecutionException ex)
+                        {
+                            Logger.getLogger(JiraWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                    else if (item.getField().equals("assignee") && config.hasUserMappings())
+                    {
+                        try
+                        {
+                           String assignee = ModifyIssue.NO_ASSIGNEE; 
+
+                            if (item.getToString() != null)
+                            {
+                                String mappedUser = config.getGithubUser(item.getTo());
+                                if (mappedUser != null)
+                                {
+                                    assignee = mappedUser;
+                                }
+                            }
+                            else 
+                            {
+                                // Need to query GH here for the current assignee and see 
+                                // if it's a non-JIRA mapped user. Otherwise a re-assignment
+                                // in GH to a non-Jira user will get nuked as JIRA sees it
+                                // as an update to "no one assigned". 
+                                
+                                net.mostlyharmless.jghservice.connector.github.GetIssue get = 
+                                    new net.mostlyharmless.jghservice.connector.github.GetIssue.Builder()
+                                        .withRepository(repository)
+                                        .withIssueNumber(ghIssueNumber)
+                                        .build();
+                                
+                                GithubEvent.Issue issue = conn.execute(get);
+                                
+                                if (issue.hasAssignee())
+                                {
+                                    String ghAssignee = issue.getAssignee().getLogin();
+                                    String jiraUser = config.getJiraUser(ghAssignee);
+                                    if (jiraUser == null)
+                                    {
+                                        continue;
+                                    }
+                                }
+                            }
+
+                            ModifyIssue modify =
+                                new ModifyIssue.Builder()
+                                    .withAssignee(assignee)
+                                    .withIssueNumber(ghIssueNumber)
+                                    .withRepository(repository)
+                                    .build();
+                        
+                            conn.execute(modify);
+                        }
+                        catch (ExecutionException ex)
+                        {
+                            Logger.getLogger(JiraWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
                 }
             }
         }
@@ -390,6 +554,20 @@ public class JiraWebhook
             }
         }
         return newList;
+    }
+    
+    private List<String> getExistingLabels(GithubConnector conn, 
+                                           ServiceConfig.Repository repository,
+                                           int ghIssueNumber) throws ExecutionException
+    {
+        GetLabelsOnIssue getLabels =
+            new GetLabelsOnIssue.Builder()
+                .withIssueNumber(ghIssueNumber)
+                .withRepo(repository)
+                .build();
+
+        return conn.execute(getLabels);
+        
     }
     
 }

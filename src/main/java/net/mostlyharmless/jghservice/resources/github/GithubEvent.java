@@ -17,6 +17,9 @@
 package net.mostlyharmless.jghservice.resources.github;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Collections;
+import java.util.List;
+import net.mostlyharmless.jghservice.resources.github.GithubEvent.Issue.Label;
 
 /**
  *
@@ -35,6 +38,10 @@ public class GithubEvent
     private Repository repository;
     @JsonProperty
     private Comment comment;
+    @JsonProperty
+    private User assignee;
+    @JsonProperty
+    private Label label;
         
     public String getAction()
     {
@@ -76,6 +83,26 @@ public class GithubEvent
         return comment != null;
     }
     
+    public boolean hasAssignee()
+    {
+        return assignee != null;
+    }
+    
+    public User getAssignee()
+    {
+        return assignee;
+    }
+    
+    public boolean hasLabel()
+    {
+        return label != null;
+    }
+    
+    public Label getLabel()
+    {
+        return label;
+    }
+    
     public static class Issue
     {
         @JsonProperty
@@ -93,6 +120,10 @@ public class GithubEvent
         private User user;
         @JsonProperty
         private Milestone milestone;
+        @JsonProperty
+        private List<Label> labels;
+        @JsonProperty
+        private User assignee;
 
         public String getTitle()
         {
@@ -133,7 +164,35 @@ public class GithubEvent
         {
             return milestone;
         }
+        
+        public List<Label> getLabels()
+        {
+            return Collections.unmodifiableList(labels);
+        }
+        
+        public boolean hasAssignee()
+        {
+            return assignee != null;
+        }
+        
+        public User getAssignee()
+        {
+            return assignee;
+        }
+        
+        public static class Label
+        {
+            @JsonProperty
+            private String name;
+
+            public String getName()
+            {
+                return name;
+            }
+        }
     }
+    
+    
     
     public static class Milestone
     {
