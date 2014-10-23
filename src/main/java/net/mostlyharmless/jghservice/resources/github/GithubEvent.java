@@ -37,6 +37,8 @@ public class GithubEvent
     private Repository repository;
     @JsonProperty
     private Comment comment;
+    @JsonProperty
+    private User assignee;
         
     public String getAction()
     {
@@ -78,6 +80,16 @@ public class GithubEvent
         return comment != null;
     }
     
+    public boolean hasAssignee()
+    {
+        return assignee != null;
+    }
+    
+    public User getAssignee()
+    {
+        return assignee;
+    }
+    
     public static class Issue
     {
         @JsonProperty
@@ -97,6 +109,8 @@ public class GithubEvent
         private Milestone milestone;
         @JsonProperty
         private List<Label> labels;
+        @JsonProperty
+        private User assignee;
 
         public String getTitle()
         {
@@ -141,6 +155,16 @@ public class GithubEvent
         public List<Label> getLabels()
         {
             return Collections.unmodifiableList(labels);
+        }
+        
+        public boolean hasAssignee()
+        {
+            return assignee != null;
+        }
+        
+        public User getAssignee()
+        {
+            return assignee;
         }
         
         public static class Label

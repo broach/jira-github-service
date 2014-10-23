@@ -42,6 +42,7 @@ import net.mostlyharmless.jghservice.connector.github.SetLabelsOnIssue;
 import net.mostlyharmless.jghservice.connector.jira.GetIssue;
 import net.mostlyharmless.jghservice.connector.jira.JiraConnector;
 import net.mostlyharmless.jghservice.resources.ServiceConfig;
+import net.mostlyharmless.jghservice.resources.github.GithubEvent;
 
 /**
  *
@@ -214,6 +215,12 @@ public class JiraWebhook
                         }
                     }
 
+                    String assignee = null;
+                    if (config.hasUserMappings() && event.getIssue().hasAsignee())
+                    {
+                        assignee = config.getGithubUser(event.getIssue().getAssignee());
+                    }
+                    
                     CreateIssue create = 
                         new CreateIssue.Builder()
                             .withTitle(title)
@@ -221,6 +228,7 @@ public class JiraWebhook
                             .withLabels(labels)
                             .withRepository(repository)
                             .withMilestone(milestone)
+                            .withAssignee(assignee)
                             .build();
                     try
                     {
@@ -277,7 +285,7 @@ public class JiraWebhook
             config.getRepoForJiraName(ghRepo);
         
         
-        if (repository != null)
+        if (repository != null && event.getIssue().hasGithubIssueNumber(config))
         {
             int ghIssueNumber = 
                             event.getIssue().getGithubIssueNumber(config);
@@ -451,6 +459,60 @@ public class JiraWebhook
                             
                             conn.execute(set);
                              
+                        }
+                        catch (ExecutionException ex)
+                        {
+                            Logger.getLogger(JiraWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                    else if (item.getField().equals("assignee") && config.hasUserMappings())
+                    {
+                        try
+                        {
+                           String assignee = ModifyIssue.NO_ASSIGNEE; 
+
+                            if (item.getToString() != null)
+                            {
+                                String mappedUser = config.getGithubUser(item.getTo());
+                                if (mappedUser != null)
+                                {
+                                    assignee = mappedUser;
+                                }
+                            }
+                            else 
+                            {
+                                // Need to query GH here for the current assignee and see 
+                                // if it's a non-JIRA mapped user. Otherwise a re-assignment
+                                // in GH to a non-Jira user will get nuked as JIRA sees it
+                                // as an update to "no one assigned". 
+                                
+                                net.mostlyharmless.jghservice.connector.github.GetIssue get = 
+                                    new net.mostlyharmless.jghservice.connector.github.GetIssue.Builder()
+                                        .withRepository(repository)
+                                        .withIssueNumber(ghIssueNumber)
+                                        .build();
+                                
+                                GithubEvent.Issue issue = conn.execute(get);
+                                
+                                if (issue.hasAssignee())
+                                {
+                                    String ghAssignee = issue.getAssignee().getLogin();
+                                    String jiraUser = config.getJiraUser(ghAssignee);
+                                    if (jiraUser == null)
+                                    {
+                                        continue;
+                                    }
+                                }
+                            }
+
+                            ModifyIssue modify =
+                                new ModifyIssue.Builder()
+                                    .withAssignee(assignee)
+                                    .withIssueNumber(ghIssueNumber)
+                                    .withRepository(repository)
+                                    .build();
+                        
+                            conn.execute(modify);
                         }
                         catch (ExecutionException ex)
                         {

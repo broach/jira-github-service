@@ -76,6 +76,8 @@ public class GithubWebhook
     
     private static final String GITHUB_ISSUE_OPENED = "opened";
     private static final String GITHUB_COMMENT_CREATED = "created";
+    private static final String GITHUB_ASSIGNED = "assigned";
+    private static final String GITHUB_UNASSIGNED = "unassigned";
     
     @POST
     @Consumes({MediaType.APPLICATION_JSON})
@@ -89,6 +91,10 @@ public class GithubWebhook
                 break;
             case GITHUB_COMMENT_CREATED:
                 processCreatedEvent(event);
+                break;
+            case GITHUB_ASSIGNED:
+            case GITHUB_UNASSIGNED:
+                processAssigned(event);
                 break;
             default:
                 break;
@@ -238,6 +244,14 @@ public class GithubWebhook
                     }
                     builder.withAffectsVersions(affectsVersions)
                             .withFixVersions(fixVersions);
+                }
+                
+                if (config.hasUserMappings() && event.getIssue().hasAssignee())
+                {
+                    String jiraAssignee = 
+                        config.getJiraUser(event.getIssue().getAssignee().getLogin());
+                    
+                    builder.withAssignee(jiraAssignee);
                 }
                 
                 try
@@ -546,6 +560,69 @@ public class GithubWebhook
         catch (ExecutionException ex)
         {
             Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    private void processAssigned(GithubEvent event)
+    {
+        if (config.hasUserMappings())
+        {
+            GithubEvent.User ghUser = event.getAssignee();
+            String jiraUser = config.getJiraUser(ghUser.getLogin());
+            
+            if (jiraUser != null)
+            {
+                // Get the current issue from JIRA
+                String title = event.getIssue().getTitle();
+                Matcher m = jiraIssuePattern.matcher(title); 
+                if (m.find())
+                {
+                    JiraConnector conn = new JiraConnector(config);
+                    GetIssue get = 
+                        new GetIssue.Builder()
+                            .withIssueKey(m.group(1))
+                            .build();
+                    try
+                    {
+                        JiraEvent.Issue issue = conn.execute(get);
+                        String jiraCurrentAssignee = issue.getAssignee();
+                        
+                        if (event.getAction().equals(GITHUB_UNASSIGNED))
+                        {
+                            if (jiraCurrentAssignee != null && 
+                                jiraCurrentAssignee.equals(jiraUser))
+                            {
+                                // Update Jira issue with no one assigned
+                                UpdateIssue update = 
+                                    new UpdateIssue.Builder()
+                                        .withJiraIssueKey(m.group(1))
+                                        .withAssignee(UpdateIssue.NO_ASSIGNEE)
+                                        .build();
+                                
+                                conn.execute(update);
+                            }
+                        }
+                        else
+                        {
+                            if (jiraCurrentAssignee == null ||
+                                !jiraCurrentAssignee.equals(jiraUser))
+                            {
+                                UpdateIssue update = 
+                                    new UpdateIssue.Builder()
+                                        .withJiraIssueKey(m.group(1))
+                                        .withAssignee(jiraUser)
+                                        .build();
+                                
+                                conn.execute(update);
+                            }
+                        }
+                    }
+                    catch (ExecutionException ex)
+                    {
+                        Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            }
         }
     }
 }

@@ -46,6 +46,9 @@ public class CreateIssue implements JiraCommand<String>
     protected final Map<String, JsonNode> customFields = new HashMap<>();
     protected final List<String> fixVersions = new LinkedList<>();
     protected final List<String> affectsVersions= new LinkedList<>();
+    protected final String assignee;
+    
+    public final static String NO_ASSIGNEE = "";
     
     protected CreateIssue(Init<?> builder)
     {
@@ -56,6 +59,7 @@ public class CreateIssue implements JiraCommand<String>
         this.customFields.putAll(builder.customFields);
         this.affectsVersions.addAll(builder.affectsVersions);
         this.fixVersions.addAll(builder.fixVersions);
+        this.assignee = builder.assignee;
     }
     
     @Override
@@ -120,6 +124,20 @@ public class CreateIssue implements JiraCommand<String>
             fields.put("versions", array);
         }
         
+        if (assignee != null)
+        {
+            ObjectNode node = factory.objectNode();
+            if (assignee.isEmpty())
+            {
+                node.put("name", factory.nullNode());
+            }
+            else
+            {
+                node.put("name", assignee);
+            }
+            fields.put("assignee", node);
+        }
+        
         for (Map.Entry<String, JsonNode> entry : customFields.entrySet())
         {
             fields.put(entry.getKey(), entry.getValue());
@@ -159,6 +177,7 @@ public class CreateIssue implements JiraCommand<String>
         private String description;
         private List<String> affectsVersions = new LinkedList<>();
         private List<String> fixVersions = new LinkedList<>();
+        private String assignee;
         
         public T withProjectKey(String projectKey)
         {
@@ -237,7 +256,11 @@ public class CreateIssue implements JiraCommand<String>
             this.affectsVersions.addAll(affectsVersions);
             return self();
         }
-        
+        public T withAssignee(String assignee)
+        {
+            this.assignee = assignee;
+            return self();
+        }
         
         
         protected void validate()
