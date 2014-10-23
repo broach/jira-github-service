@@ -33,6 +33,10 @@ There's still a bit of cruft in the code that could be cleaned up, but it works.
 
 ### Versions (optional)
 * Affected Version/s and Fix Version/s in JIRA are labeled in GH
+* Editing either in an issue in JIRA updates the labels in Github
  
 ### Assigned user mapping (optional)
-* Mapped JIRA <-> Github usernames in config allow for assigned users to be synced.
+* Mapped JIRA <-> Github usernames in config allow for users assigned to issues to be synced.
+* Assign / Unassign user in JIRA -> Github
+* Assign / Unassign user in Github -> JIRA
+* Note that assigning an unmapped user in either system results in the opposite system to show unassigned.
