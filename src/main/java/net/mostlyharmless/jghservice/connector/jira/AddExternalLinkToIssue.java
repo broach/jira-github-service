@@ -93,7 +93,7 @@ public class AddExternalLinkToIssue implements JiraCommand<String>
     @Override
     public int getExpectedResponseCode()
     {
-        return 201;
+        return 200;
     }
 
     @Override
