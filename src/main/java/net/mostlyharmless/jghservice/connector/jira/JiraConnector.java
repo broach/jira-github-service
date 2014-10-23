@@ -22,6 +22,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.xml.bind.DatatypeConverter;
 import net.mostlyharmless.jghservice.connector.UnexpectedResponseException;
 import net.mostlyharmless.jghservice.connector.github.GithubCommand;
@@ -75,6 +77,7 @@ public class JiraConnector
             
             if (responseCode != command.getExpectedResponseCode())
             {
+                Logger.getLogger(JiraConnector.class.getName()).log(Level.SEVERE, "Wrong Response code;", command.getUrl(apiUrlBase).toString());
                 throw new ExecutionException(new UnexpectedResponseException(responseCode, 
                     conn.getResponseMessage()));
             }
