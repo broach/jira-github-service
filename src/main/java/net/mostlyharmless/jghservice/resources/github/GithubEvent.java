@@ -19,6 +19,7 @@ package net.mostlyharmless.jghservice.resources.github;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Collections;
 import java.util.List;
+import net.mostlyharmless.jghservice.resources.github.GithubEvent.Issue.Label;
 
 /**
  *
@@ -39,6 +40,8 @@ public class GithubEvent
     private Comment comment;
     @JsonProperty
     private User assignee;
+    @JsonProperty
+    private Label label;
         
     public String getAction()
     {
@@ -88,6 +91,16 @@ public class GithubEvent
     public User getAssignee()
     {
         return assignee;
+    }
+    
+    public boolean hasLabel()
+    {
+        return label != null;
+    }
+    
+    public Label getLabel()
+    {
+        return label;
     }
     
     public static class Issue

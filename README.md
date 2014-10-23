@@ -32,8 +32,10 @@ There's still a bit of cruft in the code that could be cleaned up, but it works.
 * Note that neither JIRA or Github send out a notification when an Epic or Milestone is assigned to an existing issue.
 
 ### Versions (optional)
-* Affected Version/s and Fix Version/s in JIRA are labeled in GH
-* Editing either in an issue in JIRA updates the labels in Github
+* Affected Version/s and Fix Version/s created with issue in JIRA are labeled in Github.
+* Affected Version/s and Fix Version/s labeled when creating issue in Github are set in JIRA.
+* Add/Remove version in JIRA -> Github
+* Add/Remove version in Github -> JIRA
  
 ### Assigned user mapping (optional)
 * Mapped JIRA <-> Github usernames in config allow for users assigned to issues to be synced.

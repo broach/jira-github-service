@@ -407,25 +407,32 @@ public class JiraWebhook
                         try
                         {
                             existingLabels = getExistingLabels(conn, repository, ghIssueNumber);
+                            int numLabels = existingLabels.size();
                             
                             if (item.getToString() != null)
                             {
-                                existingLabels.add("Fixed in: " + item.getToString());
+                                String newLabel = "Fixed in: " + item.getToString();
+                                if (!existingLabels.contains(newLabel))
+                                {
+                                    existingLabels.add("Fixed in: " + item.getToString());
+                                }
                             }
                             else if (item.getFromString() != null)
                             {
                                 existingLabels.remove("Fixed in: " + item.getFromString());
                             }
                             
-                            SetLabelsOnIssue set = 
-                                new SetLabelsOnIssue.Builder()
-                                    .withIssueNumber(ghIssueNumber)
-                                    .withRepo(repository)
-                                    .withLabels(existingLabels)
-                                    .build();
-                            
-                            conn.execute(set);
-                             
+                            if (numLabels != existingLabels.size())
+                            {
+                                SetLabelsOnIssue set = 
+                                    new SetLabelsOnIssue.Builder()
+                                        .withIssueNumber(ghIssueNumber)
+                                        .withRepo(repository)
+                                        .withLabels(existingLabels)
+                                        .build();
+
+                                conn.execute(set);
+                            }
                         }
                         catch (ExecutionException ex)
                         {
@@ -440,25 +447,32 @@ public class JiraWebhook
                         try
                         {
                             existingLabels = getExistingLabels(conn, repository, ghIssueNumber);
+                            int numLabels = existingLabels.size();
                             
                             if (item.getToString() != null)
                             {
-                                existingLabels.add("Affects: " + item.getToString());
+                                String newLabel = "Affects: " + item.getToString();
+                                if (existingLabels.contains(newLabel))
+                                {
+                                    existingLabels.add("Affects: " + item.getToString());
+                                }
                             }
                             else if (item.getFromString() != null)
                             {
                                 existingLabels.remove("Affects: " + item.getFromString());
                             }
                             
-                            SetLabelsOnIssue set = 
-                                new SetLabelsOnIssue.Builder()
-                                    .withIssueNumber(ghIssueNumber)
-                                    .withRepo(repository)
-                                    .withLabels(existingLabels)
-                                    .build();
-                            
-                            conn.execute(set);
-                             
+                            if (numLabels != existingLabels.size())
+                            {
+                                SetLabelsOnIssue set = 
+                                    new SetLabelsOnIssue.Builder()
+                                        .withIssueNumber(ghIssueNumber)
+                                        .withRepo(repository)
+                                        .withLabels(existingLabels)
+                                        .build();
+
+                                conn.execute(set);
+                            }
                         }
                         catch (ExecutionException ex)
                         {
