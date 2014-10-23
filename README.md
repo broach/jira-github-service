@@ -31,7 +31,7 @@ There's still a bit of cruft in the code that could be cleaned up, but it works.
 * Issues created in Github with (JIRA) Milestone are mapped to the Epic in JIRA. 
 * Note that neither JIRA or Github send out a notification when an Epic or Milestone is assigned to an existing issue.
 
-### Versions (optional)
+### Versions 
 * Affected Version/s and Fix Version/s created with issue in JIRA are labeled in Github.
 * Affected Version/s and Fix Version/s labeled when creating issue in Github are set in JIRA.
 * Add/Remove version in JIRA -> Github
