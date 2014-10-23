@@ -25,8 +25,14 @@ There's still a bit of cruft in the code that could be cleaned up, but it works.
 * JIRA's PROJECT-xxx mention will automatically cause Github's #xxx to be added to body and show up on linked issue.
 * If you forget to add it to the body, a comment on the PR will now also trigger linking. 
 
-### Epics & Milestones
+### Epics & Milestones (optional)
 * Epics created in JIRA are created in Github as Milestones
 * Issues created in JIRA with an Epic link are put under the Milestone in Github
 * Issues created in Github with (JIRA) Milestone are mapped to the Epic in JIRA. 
 * Note that neither JIRA or Github send out a notification when an Epic or Milestone is assigned to an existing issue.
+
+### Versions (optional)
+* Affected Version/s and Fix Version/s in JIRA are labeled in GH
+ 
+### Assigned user mapping (optional)
+* Mapped JIRA <-> Github usernames in config allow for assigned users to be synced.
