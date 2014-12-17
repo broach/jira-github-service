@@ -205,7 +205,7 @@ public class GithubWebhook
                 CreateIssue.Builder builder = 
                     new CreateIssue.Builder()
                         .withProjectKey(jiraProjectKey)
-                        .withIssuetype("Task")
+                        .withIssuetype("Story")
                         .withSummary(event.getIssue().getTitle())
                         .withDescription(body)
                         .withCustomField(githubIssueField, githubIssueNumber)
