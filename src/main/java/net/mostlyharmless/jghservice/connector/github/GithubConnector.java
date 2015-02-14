@@ -22,6 +22,8 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.xml.bind.DatatypeConverter;
 import net.mostlyharmless.jghservice.connector.UnexpectedResponseException;
 import net.mostlyharmless.jghservice.resources.ServiceConfig;
@@ -35,7 +37,8 @@ public class GithubConnector
     private final String encodedUserPass;
     private final String userAgentName;
     private final String apiUrlBase;
-    
+    private static final Logger LOGGER = Logger.getLogger(GithubConnector.class.getName());
+
     public GithubConnector(ServiceConfig config)
     {
         encodedUserPass = DatatypeConverter.printBase64Binary((config.getGithub().getUsername() + ":" + config.getGithub().getPassword()).getBytes());
@@ -74,6 +77,12 @@ public class GithubConnector
             
             if (responseCode != command.getExpectedResponseCode())
             {
+                LOGGER.log(Level.WARNING, "Incorrect response; expected " + command.getExpectedResponseCode() + " received " + responseCode);
+                LOGGER.log(Level.INFO, command.getUrl(apiUrlBase).toString());
+                if (!command.getRequestMethod().equals(GithubCommand.GET))
+                {
+                    LOGGER.log(Level.INFO, command.getJson());
+                }
                 throw new ExecutionException(new UnexpectedResponseException(responseCode, 
                     conn.getResponseMessage()));
             }

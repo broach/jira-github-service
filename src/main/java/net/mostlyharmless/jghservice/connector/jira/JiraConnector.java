@@ -37,6 +37,7 @@ public class JiraConnector
 {
     private final String encodedUserPass;
     private final String apiUrlBase;
+    private static final Logger LOGGER = Logger.getLogger(JiraConnector.class.getName());
     
     public JiraConnector(ServiceConfig config)
     {
@@ -77,7 +78,12 @@ public class JiraConnector
             
             if (responseCode != command.getExpectedResponseCode())
             {
-                Logger.getLogger(JiraConnector.class.getName()).log(Level.SEVERE, "Wrong Response code;", command.getUrl(apiUrlBase).toString());
+                LOGGER.log(Level.WARNING, "Incorrect response; expected " + command.getExpectedResponseCode() + " received " + responseCode);
+                LOGGER.log(Level.INFO, command.getUrl(apiUrlBase).toString());
+                if (!command.getRequestMethod().equals(GithubCommand.GET))
+                {
+                    LOGGER.log(Level.INFO, command.getJson());
+                }
                 throw new ExecutionException(new UnexpectedResponseException(responseCode, 
                     conn.getResponseMessage()));
             }

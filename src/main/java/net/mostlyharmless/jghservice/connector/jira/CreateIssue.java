@@ -243,6 +243,38 @@ public class CreateIssue implements JiraCommand<String>
             return self();
         }
         
+        public T withCustomArrayField(String fieldName, String key, String value)
+        {
+            JsonNode fieldNode = customFields.get(fieldName);
+            if (fieldNode == null || !fieldNode.isArray())
+            {
+                fieldNode = JsonNodeFactory.instance.arrayNode();
+                customFields.put(fieldName, fieldNode);
+            }
+            
+            JsonNode nodeInArray = JsonNodeFactory.instance.objectNode();
+            ((ObjectNode)nodeInArray).put(key,value);
+            
+            ((ArrayNode)fieldNode).add(nodeInArray);
+            return self();
+        }
+        
+        public T withCustomArrayField(String fieldName, String key, int value)
+        {
+            JsonNode fieldNode = customFields.get(fieldName);
+            if (fieldNode == null || !fieldNode.isArray())
+            {
+                fieldNode = JsonNodeFactory.instance.arrayNode();
+                customFields.put(fieldName, fieldNode);
+            }
+            
+            JsonNode nodeInArray = JsonNodeFactory.instance.objectNode();
+            ((ObjectNode)nodeInArray).put(key,value);
+            
+            ((ArrayNode)fieldNode).add(nodeInArray);
+            return self();
+        }
+        
         public T withFixVersions(List<String> fixVersions)
         {
             this.fixVersions.clear();

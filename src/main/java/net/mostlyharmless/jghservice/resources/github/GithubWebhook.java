@@ -82,6 +82,8 @@ public class GithubWebhook
     private static final String GITHUB_LABELED = "labeled";
     private static final String GITHUB_UNLABELED = "unlabeled";
     
+    private static final Logger LOGGER = Logger.getLogger(GithubWebhook.class.getName());
+    
     @POST
     @Consumes({MediaType.APPLICATION_JSON})
     @Produces(MediaType.APPLICATION_JSON)
@@ -150,6 +152,12 @@ public class GithubWebhook
                 ServiceConfig.Repository repo = 
                     config.getRepoForGithubName(event.getRepository().getName());
 
+                if (repo == null)
+                {
+                    LOGGER.log(Level.INFO, "No repo defined for: " + event.getRepository().getName());
+                    return null;
+                }
+                
                 String jiraProjectKey = repo.getJiraProjectKey();
                 String jiraRepoName = repo.getJiraName();
                 int githubIssueNumber = event.getIssue().getNumber();
@@ -217,6 +225,10 @@ public class GithubWebhook
                     if (field.getType().equals("object"))
                     {
                         builder.withCustomField(field.getName(), field.getKey(), field.getValue());
+                    }
+                    else if (field.getType().equals("array"))
+                    {
+                        builder.withCustomArrayField(field.getName(), field.getKey(), field.getValue());
                     }
                     else
                     {
