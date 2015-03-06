@@ -18,6 +18,7 @@ package net.mostlyharmless.jghservice.connector.github;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
@@ -83,6 +84,29 @@ public class GithubConnector
                 {
                     LOGGER.log(Level.INFO, command.getJson());
                 }
+                
+                if (responseCode >= 400)
+                {
+                    InputStream is = conn.getErrorStream();
+                    if (is == null)
+                    {
+                        is = conn.getInputStream();
+                    }
+                    
+                    if (is != null)
+                    {
+                        StringBuilder sb = new StringBuilder();
+                        BufferedReader br = new BufferedReader(new InputStreamReader(is));
+                        String resp = null;
+                        while ((resp = br.readLine()) != null)
+                        {
+                            sb.append(resp);
+                        }
+                        
+                        LOGGER.log(Level.INFO, sb.toString());
+                    }
+                }
+                
                 throw new ExecutionException(new UnexpectedResponseException(responseCode, 
                     conn.getResponseMessage()));
             }

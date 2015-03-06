@@ -343,7 +343,8 @@ public class JiraWebhook
                         
                         if (item.getToString().equals("Closed") 
                           || item.getToString().equals("Reopened")
-                          || item.getToString().equals("Resolved"))
+                          || item.getToString().equals("Resolved")
+                            || item.getToString().equals("Done"))
                         {
                             // Issue closed/reopened in JIRA, close/reopen in GH
                             ModifyIssue.Builder builder =
