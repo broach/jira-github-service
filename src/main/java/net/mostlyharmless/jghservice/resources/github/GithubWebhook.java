@@ -74,6 +74,8 @@ public class GithubWebhook
         Pattern.compile("^Fixed in: (.+)$");
     private static final Pattern extractAffectsVersion =
         Pattern.compile("^Affects: (.*)$");
+    private static final Pattern extractImportCommand = 
+        Pattern.compile("^create jira issue.*", Pattern.CASE_INSENSITIVE);
     
     private static final String GITHUB_ISSUE_OPENED = "opened";
     private static final String GITHUB_COMMENT_CREATED = "created";
@@ -287,6 +289,7 @@ public class GithubWebhook
         else if (event.hasPullRequest())
         {
             linkPullRequestToIssue(conn, event);
+            
         }
         
         return jiraIssueKey;
@@ -502,6 +505,8 @@ public class GithubWebhook
             {
                 // Allow comments on pull requests to link to an issue
                 linkPullRequestToIssue(conn, event);
+                // Allow for importing PRs without issues into JIRA
+                createNewJiraIssueFromPR(conn, event);
             }
             else
             {
@@ -743,5 +748,73 @@ public class GithubWebhook
             
             
         }
+    }
+
+    private void createNewJiraIssueFromPR(JiraConnector conn, GithubEvent event)
+    {
+        // PR created, see if we should create a JIRA issue
+        String body;
+        if (event.hasPullRequest())
+        {
+            body = event.getPullRequest().getBody();
+        }
+        else // It's a pull request comment, disguised as an issue (wrapped in an Enigma)
+        {
+            body = event.getComment().getBody();
+        }
+        
+        Matcher m = extractImportCommand.matcher(body);
+        if (m.find())
+        {
+            // Alrighty then. Create a new issue in JIRA to review this PR.
+            String jiraRepoField = config.getJira().getGithubRepoNameField();
+            ServiceConfig.Repository repo = 
+                config.getRepoForGithubName(event.getRepository().getName());
+
+            if (repo == null)
+            {
+                LOGGER.log(Level.INFO, "No repo defined for: {}", event.getRepository().getName());
+                return;
+            }
+            
+            String jiraProjectKey = repo.getJiraProjectKey();
+            
+            CreateIssue.Builder builder = 
+                    new CreateIssue.Builder()
+                        .withProjectKey(jiraProjectKey)
+                        .withIssuetype("Story")
+                        .withSummary("Review submitted PR")
+                        .withDescription("The linked PR was imported from Github. It needs to be reviewed")
+                        .withCustomField(jiraRepoField, "value", "Do Not Link To Repo");
+            
+            // populate any custom fields from repo config
+            for (ServiceConfig.Repository.JiraField field : repo.getJiraFields())
+            {
+                switch (field.getType())
+                {
+                    case "object":
+                        builder.withCustomField(field.getName(), field.getKey(), field.getValue());
+                        break;
+                    case "array":
+                        builder.withCustomArrayField(field.getName(), field.getKey(), field.getValue());
+                        break;
+                    default:
+                        builder.withCustomField(field.getName(), field.getValue());
+                        break;
+                }
+            }
+            
+            try
+            {
+                String jiraIssueKey = conn.execute(builder.build());
+                createExternalLink(conn, jiraIssueKey, event);
+            }
+            catch (ExecutionException ex)
+            {
+                Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            
+        }
+        
     }
 }
