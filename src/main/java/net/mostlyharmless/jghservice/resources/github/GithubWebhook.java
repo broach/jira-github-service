@@ -35,6 +35,7 @@ import javax.ws.rs.core.Response;
 import net.mostlyharmless.jghservice.connector.github.GetCommentsOnIssue;
 import net.mostlyharmless.jghservice.connector.github.GithubConnector;
 import net.mostlyharmless.jghservice.connector.github.ModifyComment;
+import net.mostlyharmless.jghservice.connector.github.SetLabelsOnIssue;
 import net.mostlyharmless.jghservice.connector.github.UpdatePullRequest;
 import net.mostlyharmless.jghservice.connector.jira.AddExternalLinkToIssue;
 import net.mostlyharmless.jghservice.connector.jira.CreateIssue;
@@ -505,61 +506,59 @@ public class GithubWebhook
             {
                 // Allow comments on pull requests to link to an issue
                 linkPullRequestToIssue(conn, event);
-                // Allow for importing PRs without issues into JIRA
+                // Allow special comment to import PRs without issues into JIRA
                 createNewJiraIssueFromPR(conn, event);
             }
-            else
+
+            String body = event.getComment().getBody();
+            Matcher m = jiraCommentPattern.matcher(body);
+
+            if (!m.find())
             {
-                String body = event.getComment().getBody();
-                Matcher m = jiraCommentPattern.matcher(body);
+                // Comment originating on GH, post to JIRA
 
-                if (!m.find())
+                // The JIRA issue key is in the title
+                String issueTitle = event.getIssue().getTitle();
+                m = jiraIssuePattern.matcher(issueTitle);
+                if (m.find())
                 {
-                    // Comment originating on GH, post to JIRA
+                    postCommentToJira(conn, m.group(1), 
+                                      event.getComment().getUser().getLogin(), 
+                                      body);
+                }
+                else
+                {
+                    // The issue isn't in JIRA. Check to see if we should
+                    // import it. This is for when the service is added to
+                    // a GH repo with existing issues.
+                    Repository repo = config.getRepoForGithubName(event.getRepository().getName());
+                    if (repo.importOnComment())
+                    {
+                        String jiraIssueKey = processOpenedEvent(event);
 
-                    // The JIRA issue key is in the title
-                    String issueTitle = event.getIssue().getTitle();
-                    m = jiraIssuePattern.matcher(issueTitle);
-                    if (m.find())
-                    {
-                        postCommentToJira(conn, m.group(1), 
-                                          event.getComment().getUser().getLogin(), 
-                                          body);
-                    }
-                    else
-                    {
-                        // The issue isn't in JIRA. Check to see if we should
-                        // import it. This is for when the service is added to
-                        // a GH repo with existing issues.
-                        Repository repo = config.getRepoForGithubName(event.getRepository().getName());
-                        if (repo.importOnComment())
+                        // Now we have to import comments
+                        GithubConnector ghConn = new GithubConnector(config);
+
+                        GetCommentsOnIssue get =
+                            new GetCommentsOnIssue.Builder()
+                                .withRepository(repo)
+                                .withIssueNumber(event.getIssue().getNumber())
+                                .build();
+                        try
                         {
-                            String jiraIssueKey = processOpenedEvent(event);
-                            
-                            // Now we have to import comments
-                            GithubConnector ghConn = new GithubConnector(config);
-                            
-                            GetCommentsOnIssue get =
-                                new GetCommentsOnIssue.Builder()
-                                    .withRepository(repo)
-                                    .withIssueNumber(event.getIssue().getNumber())
-                                    .build();
-                            try
+                            List<GithubEvent.Comment> comments = ghConn.execute(get);
+                            for (Comment comment : comments)
                             {
-                                List<GithubEvent.Comment> comments = ghConn.execute(get);
-                                for (Comment comment : comments)
-                                {
-                                    postCommentToJira(conn, jiraIssueKey, 
-                                                      comment.getUser().getLogin(), 
-                                                      comment.getBody());
-                                }
+                                postCommentToJira(conn, jiraIssueKey, 
+                                                  comment.getUser().getLogin(), 
+                                                  comment.getBody());
                             }
-                            catch (ExecutionException ex)
-                            {
-                                Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                            
                         }
+                        catch (ExecutionException ex)
+                        {
+                            Logger.getLogger(GithubWebhook.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+
                     }
                 }
             }
@@ -767,17 +766,22 @@ public class GithubWebhook
         if (m.find())
         {
             // Alrighty then. Create a new issue in JIRA to review this PR.
-            String jiraRepoField = config.getJira().getGithubRepoNameField();
+            
             ServiceConfig.Repository repo = 
                 config.getRepoForGithubName(event.getRepository().getName());
-
+            
             if (repo == null)
             {
                 LOGGER.log(Level.INFO, "No repo defined for: {}", event.getRepository().getName());
                 return;
             }
-            
+            String jiraRepoField = config.getJira().getGithubRepoNameField();
+            String githubIssueField = config.getJira().getGithubIssueNumberField();
+            String jiraRepoName = repo.getJiraName();
             String jiraProjectKey = repo.getJiraProjectKey();
+            int githubIssueNumber = event.getIssue().getNumber();
+            
+            
             
             CreateIssue.Builder builder = 
                     new CreateIssue.Builder()
@@ -785,7 +789,9 @@ public class GithubWebhook
                         .withIssuetype("Story")
                         .withSummary("Review submitted PR")
                         .withDescription("The linked PR was imported from Github. It needs to be reviewed")
-                        .withCustomField(jiraRepoField, "value", "Do Not Link To Repo");
+                        .withCustomField(jiraRepoField, "value", jiraRepoName)
+                        .withCustomField(githubIssueField, githubIssueNumber)
+                        .withLabel(jiraRepoName + "_PR_Review");
             
             // populate any custom fields from repo config
             for (ServiceConfig.Repository.JiraField field : repo.getJiraFields())
@@ -808,6 +814,7 @@ public class GithubWebhook
             {
                 String jiraIssueKey = conn.execute(builder.build());
                 createExternalLink(conn, jiraIssueKey, event);
+                
             }
             catch (ExecutionException ex)
             {

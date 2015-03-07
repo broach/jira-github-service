@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.node.NumericNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
@@ -47,6 +48,7 @@ public class CreateIssue implements JiraCommand<String>
     protected final List<String> fixVersions = new LinkedList<>();
     protected final List<String> affectsVersions= new LinkedList<>();
     protected final String assignee;
+    protected final List<String> labels = new LinkedList<>();
     
     public final static String NO_ASSIGNEE = "";
     
@@ -60,6 +62,7 @@ public class CreateIssue implements JiraCommand<String>
         this.affectsVersions.addAll(builder.affectsVersions);
         this.fixVersions.addAll(builder.fixVersions);
         this.assignee = builder.assignee;
+        this.labels.addAll(builder.labels);
     }
     
     @Override
@@ -124,6 +127,16 @@ public class CreateIssue implements JiraCommand<String>
             fields.put("versions", array);
         }
         
+        if (!labels.isEmpty())
+        {
+            ArrayNode array = factory.arrayNode();
+            for (String label : labels)
+            {
+                array.add(label);
+            }
+            fields.put("labels", array);
+        }
+        
         if (assignee != null)
         {
             ObjectNode node = factory.objectNode();
@@ -178,6 +191,7 @@ public class CreateIssue implements JiraCommand<String>
         private List<String> affectsVersions = new LinkedList<>();
         private List<String> fixVersions = new LinkedList<>();
         private String assignee;
+        private final List<String> labels = new LinkedList<>();
         
         public T withProjectKey(String projectKey)
         {
@@ -294,6 +308,17 @@ public class CreateIssue implements JiraCommand<String>
             return self();
         }
         
+        public T withLabels(List<String> labels)
+        {
+            this.labels.addAll(labels);
+            return self();
+        }
+        
+        public T withLabel(String label)
+        {
+            this.labels.add(label);
+            return self();
+        }
         
         protected void validate()
         {

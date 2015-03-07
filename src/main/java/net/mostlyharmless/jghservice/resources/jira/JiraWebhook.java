@@ -259,6 +259,15 @@ public class JiraWebhook
                     labels = removeJiraStatusLabels(labels);
                     labels.add("JIRA: To Do");
                     
+                    List<String> existingLabels = event.getIssue().getLabels();
+                    for (String label : existingLabels)
+                    {
+                        if (label.endsWith("PR_Review"))
+                        {
+                            labels.add("JIRA: PR Review");
+                        }
+                    }
+                    
                     ModifyIssue modify =
                         new ModifyIssue.Builder()
                             .withTitle(title)

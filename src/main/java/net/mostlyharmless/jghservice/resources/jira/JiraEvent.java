@@ -104,6 +104,7 @@ public class JiraEvent
         private final List<String> affectsVersionsList;
         private final String assignee;
         private final Map<String, JsonNode> customFields;
+        private final List<String> labels;
         
         public Issue(String key, String summary, String description, 
                                                  Map<String,JsonNode> customFields,
@@ -111,7 +112,8 @@ public class JiraEvent
                                                  String type,
                                                  List<String> fixVersionsList,
                                                  List<String> affectsVersionsList,
-                                                 String assigneeName)
+                                                 String assigneeName,
+                                                 List<String> labels)
         {
             this.jiraIssueKey = key;
             this.summary = summary;
@@ -122,6 +124,7 @@ public class JiraEvent
             this.fixVersionsList = fixVersionsList;
             this.affectsVersionsList = affectsVersionsList;
             this.assignee = assigneeName;
+            this.labels = labels;
         }
         
         public String getGithubRepo(ServiceConfig config)
@@ -232,6 +235,11 @@ public class JiraEvent
             return assignee;
         }
         
+        public List<String> getLabels()
+        {
+            return labels;
+        }
+        
         public static class Reporter
         {
             @JsonProperty
@@ -271,6 +279,13 @@ public class JiraEvent
                     affectsVersionList.add(version.get("name").textValue());
                 }
                 
+                List<String> labels = new LinkedList<>();
+                ArrayNode labelArray = (ArrayNode) node.get("labels");
+                for (JsonNode label : labelArray)
+                {
+                    labels.add(label.asText());
+                }
+                
                 JsonNode assignee = node.get("assignee");
                 String assigneeName = null;
                 if (!assignee.isNull())
@@ -292,7 +307,7 @@ public class JiraEvent
                 
                 return new Issue(key, summary, description, customFields, r, 
                                     type, fixVersionList, affectsVersionList,
-                                    assigneeName);
+                                    assigneeName, labels);
                 
             }
             
