@@ -781,17 +781,21 @@ public class GithubWebhook
             String jiraProjectKey = repo.getJiraProjectKey();
             int githubIssueNumber = event.getIssue().getNumber();
             
+            String desc = "The PR linked to this issue was created in the " 
+                + jiraRepoName  + " repository and needs to be reviewed.";
             
+            String label = jiraRepoName.replace(" ", "_") + "_PR_Review";
             
             CreateIssue.Builder builder = 
                     new CreateIssue.Builder()
                         .withProjectKey(jiraProjectKey)
                         .withIssuetype("Story")
                         .withSummary("Review submitted PR")
-                        .withDescription("The linked PR was imported from Github. It needs to be reviewed")
+                        .withDescription(desc)
                         .withCustomField(jiraRepoField, "value", jiraRepoName)
                         .withCustomField(githubIssueField, githubIssueNumber)
-                        .withLabel(jiraRepoName + "_PR_Review");
+                        .withLabel(label);
+                        
             
             // populate any custom fields from repo config
             for (ServiceConfig.Repository.JiraField field : repo.getJiraFields())
