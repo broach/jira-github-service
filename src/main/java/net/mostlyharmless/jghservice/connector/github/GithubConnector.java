@@ -105,24 +105,24 @@ public class GithubConnector
                         
                         LOGGER.log(Level.INFO, sb.toString());
                     }
+                    throw new ExecutionException(new UnexpectedResponseException(responseCode, 
+                    conn.getResponseMessage()));
                 }
                 
-                throw new ExecutionException(new UnexpectedResponseException(responseCode, 
-                    conn.getResponseMessage()));
+                
             }
-            else
+            
+            StringBuilder sb = new StringBuilder();
+            String line;
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+
+            while ((line = br.readLine()) != null)
             {
-                StringBuilder sb = new StringBuilder();
-                String line;
-                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-
-                while ((line = br.readLine()) != null)
-                {
-                    sb.append(line);
-                }
-
-                return command.processResponse(sb.toString());
+                sb.append(line);
             }
+
+            return command.processResponse(sb.toString());
+            
             
         }
         catch (IOException ex)
