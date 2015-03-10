@@ -530,9 +530,10 @@ public class GithubWebhook
                 {
                     // The issue isn't in JIRA. Check to see if we should
                     // import it. This is for when the service is added to
-                    // a GH repo with existing issues.
+                    // a GH repo with existing issues. Note that we do *not*
+                    // want to do this with a PR. 
                     Repository repo = config.getRepoForGithubName(event.getRepository().getName());
-                    if (repo.importOnComment())
+                    if (repo.importOnComment() && !event.getIssue().isReallyAPullRequest())
                     {
                         String jiraIssueKey = processOpenedEvent(event);
 
